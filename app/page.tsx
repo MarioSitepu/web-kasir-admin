@@ -1199,33 +1199,39 @@ export default function IndigoPOSDashboard() {
         {/* ================= SCREEN 4: LAPORAN KEUANGAN & STORAGE ================= */}
         {activeTab === "reports" && (
           <div className="space-y-6 w-full text-left">
-            {/* 1. DATABASE STORAGE USAGE CARD */}
-            <div className="figma-card p-6 bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl rounded-2xl border-none">
+            {/* 1. DATABASE STORAGE USAGE CARD (FIGMA CLEAN HIGH-CONTRAST) */}
+            <div className="figma-card p-6 border border-slate-200 shadow-sm rounded-2xl bg-white text-slate-800">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-5 h-5 text-indigo-400" />
-                    <h3 className="font-extrabold text-lg text-white">Status Penyimpanan Firebase RTDB</h3>
-                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                      Spark Plan (Gratis)
-                    </span>
+                <div className="space-y-1.5 text-left">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                      <Database className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-base text-slate-900 leading-none">Status Penyimpanan Database</h3>
+                        <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          Spark Plan (Gratis)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Memantau ukuran data produk, transaksi kasir, dan riwayat mutasi stok realtime.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-300">
-                    Memantau ukuran data produk, transaksi kasir, dan riwayat mutasi stok.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-left">
-                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Kapasitas Terpakai</p>
-                    <p className="text-base font-extrabold text-white">
-                      {metrics.totalKB} KB <span className="text-xs text-slate-400 font-medium">({metrics.totalMB} MB)</span>
+                  <div className="bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-xl text-left">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kapasitas Terpakai</p>
+                    <p className="text-sm font-extrabold text-slate-900">
+                      {metrics.totalKB} KB <span className="text-xs text-slate-500 font-semibold">({metrics.totalMB} MB)</span>
                     </p>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-left">
-                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Batas Kuota Gratis</p>
-                    <p className="text-base font-extrabold text-white">
-                      1.000 MB <span className="text-xs text-slate-400 font-medium">(1 GB)</span>
+                  <div className="bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-xl text-left">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Batas Kuota Gratis</p>
+                    <p className="text-sm font-extrabold text-slate-900">
+                      1.000 MB <span className="text-xs text-slate-500 font-semibold">(1 GB)</span>
                     </p>
                   </div>
                   <button
@@ -1234,24 +1240,24 @@ export default function IndigoPOSDashboard() {
                       setConfirmDeleteText("");
                       setIsDeleteMonthModalOpen(true);
                     }}
-                    className="px-4 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/40 transition-all flex items-center gap-1.5 border border-rose-500/50"
+                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs shadow-xs transition-all flex items-center gap-1.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                     <span>Hapus Data Per Bulan</span>
                   </button>
                 </div>
               </div>
 
               {/* Progress bar storage */}
-              <div className="mt-5 pt-4 border-t border-white/10">
+              <div className="mt-5 pt-4 border-t border-slate-100">
                 <div className="flex justify-between items-center text-xs font-semibold mb-2">
-                  <span className="text-slate-300">Penggunaan Storage: {metrics.storageUsagePercent}%</span>
-                  <span className="text-emerald-400 font-bold">Tersisa 99.98% (Sangat Luang)</span>
+                  <span className="text-slate-600 font-medium">Penggunaan Storage: <strong className="text-slate-900">{metrics.storageUsagePercent}%</strong></span>
+                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Tersisa 99.98% (Sangat Luang)</span>
                 </div>
-                <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden p-0.5">
+                <div className="w-full h-2.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-indigo-400 rounded-full transition-all duration-500"
-                    style={{ width: metrics.storageUsagePercent + "%", minWidth: "8px" }}
+                    className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                    style={{ width: metrics.storageUsagePercent + "%", minWidth: "12px" }}
                   />
                 </div>
               </div>
