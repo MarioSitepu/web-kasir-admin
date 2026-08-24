@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { db } from "@/lib/firebase";
@@ -142,7 +142,7 @@ export default function IndigoPOSDashboard() {
     { id: "Snacks", label: "Snacks" },
   ];
 
-  // 1. Firebase Listeners
+  // Firebase Listeners
   useEffect(() => {
     const productsRef = ref(db, "products");
     const unsubProducts = onValue(productsRef, (snapshot) => {
@@ -204,7 +204,6 @@ export default function IndigoPOSDashboard() {
     };
   }, []);
 
-  // Formatters
   const formatIDR = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -224,17 +223,12 @@ export default function IndigoPOSDashboard() {
     });
   };
 
-  // Metrics Calculations
   const metrics = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startOfWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
-    const startOfMonth = startOfToday - 30 * 24 * 60 * 60 * 1000;
 
     const todayTx = transactions.filter((t) => (t.createdAt || 0) >= startOfToday);
-    const weekTx = transactions.filter((t) => (t.createdAt || 0) >= startOfWeek);
-    const monthTx = transactions.filter((t) => (t.createdAt || 0) >= startOfMonth);
-
     const todaySales = todayTx.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
     const todayOrders = todayTx.length;
 
@@ -291,7 +285,6 @@ export default function IndigoPOSDashboard() {
     };
   }, [transactions, products]);
 
-  // Export CSV
   const handleExportCSV = () => {
     if (transactions.length === 0) {
       alert("Belum ada data transaksi untuk diexport");
@@ -317,7 +310,6 @@ export default function IndigoPOSDashboard() {
     showToast("CSV Berhasil Diexport", "Laporan penjualan telah diunduh ke komputer Anda.");
   };
 
-  // Product CRUD with Dual-Key write for 100% Android & Web Compatibility
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -470,6 +462,7 @@ export default function IndigoPOSDashboard() {
       alert("Error updating stock: " + err);
     }
   };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased">
       {/* Toast Notification */}
@@ -898,6 +891,7 @@ export default function IndigoPOSDashboard() {
             </div>
           </div>
         )}
+
         {/* ================= SCREEN 3: INVENTORY & STOCK ================= */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
