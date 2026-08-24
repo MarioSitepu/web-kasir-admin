@@ -1591,39 +1591,16 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-left">
-                <div className="text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-slate-700 text-left">Kode Barang (SKU)</label>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, sku: generateSKU(formData.category) })}
-                      className="text-[11px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
-                      title="Acak / Buat Kode Baru"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Auto</span>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="MIN-4821"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-indigo-500 text-left"
-                  />
-                </div>
-
-                <div className="text-left">
-                  <label className="block font-bold text-slate-700 mb-1 text-left">Stok Awal (Unit)</label>
-                  <input
-                    type="number"
-                    value={formData.stockQuantity}
-                    onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                    placeholder="50"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-left"
-                  />
-                </div>
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">Stok Awal (Unit) *</label>
+                <input
+                  type="number"
+                  required
+                  value={formData.stockQuantity}
+                  onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                  placeholder="50"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-left"
+                />
               </div>
 
               {/* Enhanced Image Section: Upload File or URL */}
