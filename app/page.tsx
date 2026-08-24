@@ -1210,9 +1210,7 @@ export default function IndigoPOSDashboard() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-extrabold text-base text-slate-900 leading-none">Status Penyimpanan Database</h3>
-                        <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          Spark Plan (Gratis)
-                        </span>
+                        
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
                         Memantau ukuran data produk, transaksi kasir, dan riwayat mutasi stok realtime.
