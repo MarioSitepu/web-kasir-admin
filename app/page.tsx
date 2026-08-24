@@ -41,9 +41,9 @@ const parseProduct = (key: string, val: any): Product => {
   return {
     id: key,
     sku: val.sku || `SKU-${key.slice(-4)}`,
-    name: val.name || "Unnamed Product",
+    name: val.name || "Menu Tanpa Nama",
     price: Number(val.price) || 0,
-    category: val.category || "Drinks",
+    category: val.category || "Minuman",
     imageUrl: val.imageUrl || val.image_url || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400",
     isActive: val.isActive !== undefined ? Boolean(val.isActive) : (val.is_active !== undefined ? Boolean(val.is_active) : true),
     stockQuantity: val.stockQuantity !== undefined ? Number(val.stockQuantity) : (val.stock_quantity !== undefined ? Number(val.stock_quantity) : 50),
@@ -87,7 +87,7 @@ const parseTransaction = (key: string, val: any): Transaction => {
     cashReceived: Number(val.cashReceived || val.cash_given || 0),
     changeGiven: Number(val.changeGiven || val.change_due || 0),
     createdAt,
-    cashierName: val.cashierName || "Kasir 01",
+    cashierName: val.cashierName || "Kasir Utama",
   };
 };
 
@@ -102,7 +102,7 @@ export default function IndigoPOSDashboard() {
 
   // Filters
   const [menuSearch, setMenuSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "all">("7days");
 
   // Modals
@@ -129,17 +129,17 @@ export default function IndigoPOSDashboard() {
     name: "",
     sku: "",
     price: "",
-    category: "Drinks",
+    category: "Minuman",
     stockQuantity: "50",
     imageUrl: "",
     isActive: true,
   });
 
   const categories = [
-    { id: "All", label: "All Categories" },
-    { id: "Drinks", label: "Drinks" },
-    { id: "Food", label: "Food" },
-    { id: "Snacks", label: "Snacks" },
+    { id: "Semua", label: "Semua Kategori" },
+    { id: "Minuman", label: "Minuman" },
+    { id: "Makanan", label: "Makanan" },
+    { id: "Snack", label: "Cemilan & Snack" },
   ];
 
   // Firebase Listeners
@@ -266,7 +266,7 @@ export default function IndigoPOSDashboard() {
     const cashPct = totalRev > 0 ? Math.round((cashTotal / totalRev) * 100) : 30;
     const transferPct = totalRev > 0 ? Math.max(0, 100 - qrisPct - cashPct) : 10;
 
-    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
     return {
       todaySales,
       todayOrders,
@@ -287,10 +287,10 @@ export default function IndigoPOSDashboard() {
 
   const handleExportCSV = () => {
     if (transactions.length === 0) {
-      alert("Belum ada data transaksi untuk diexport");
+      alert("Belum ada data transaksi untuk diunduh");
       return;
     }
-    const headers = ["Invoice Number", "Date", "Items", "Payment Method", "Grand Total (IDR)"];
+    const headers = ["No. Invoice", "Tanggal", "Item Pesanan", "Metode Bayar", "Total Bayar (Rp)"];
     const rows = transactions.map((t) => [
       `"${t.invoiceNumber || t.id}"`,
       `"${new Date(t.createdAt).toISOString()}"`,
@@ -303,11 +303,11 @@ export default function IndigoPOSDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `sales_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `laporan_penjualan_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("CSV Berhasil Diexport", "Laporan penjualan telah diunduh ke komputer Anda.");
+    showToast("Laporan Berhasil Diunduh", "File CSV telah tersimpan di komputer Anda.");
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -333,7 +333,7 @@ export default function IndigoPOSDashboard() {
           isActive: formData.isActive,
           updatedAt: now,
         });
-        showToast("Product Updated", `"${formData.name}" has been updated in database.`);
+        showToast("Menu Diperbarui", `Perubahan "${formData.name}" langsung aktif di kasir.`);
       } else {
         const newProductRef = push(ref(db, "products"));
         const newId = newProductRef.key!;
@@ -364,11 +364,11 @@ export default function IndigoPOSDashboard() {
           quantity: stockNum,
           previousStock: 0,
           currentStock: stockNum,
-          notes: "Initial inventory setup",
-          createdBy: "Mario Sitepu",
+          notes: "Stok awal saat tambah menu baru",
+          createdBy: "Mario Sitepu (Pemilik)",
           timestamp: now,
         });
-        showToast("Product Added", `"${formData.name}" is now live in database & tablet.`);
+        showToast("Menu Berhasil Ditambah", `"${formData.name}" sekarang muncul di tablet kasir.`);
       }
 
       setIsAddProductOpen(false);
@@ -378,13 +378,13 @@ export default function IndigoPOSDashboard() {
         name: "",
         sku: "",
         price: "",
-        category: "Drinks",
+        category: "Minuman",
         stockQuantity: "50",
         imageUrl: "",
         isActive: true,
       });
     } catch (err) {
-      alert("Error saving product: " + err);
+      alert("Gagal menyimpan menu: " + err);
     }
   };
 
@@ -397,19 +397,22 @@ export default function IndigoPOSDashboard() {
         is_active: nextState,
         updatedAt: Date.now(),
       });
-      showToast(nextState ? "Product Active" : "Product Inactive", `"${p.name}" status updated.`);
+      showToast(
+        nextState ? "Menu Diaktifkan" : "Menu Dinonaktifkan",
+        `"${p.name}" ${nextState ? "dapat dipilih kasir" : "disembunyikan dari kasir"}.`
+      );
     } catch (err) {
-      alert("Error updating status: " + err);
+      alert("Gagal mengubah status: " + err);
     }
   };
 
   const handleDeleteProduct = async (p: Product) => {
-    if (confirm(`Are you sure you want to delete "${p.name}"?`)) {
+    if (confirm(`Yakin ingin menghapus menu "${p.name}" dari katalog kasir?`)) {
       try {
         await remove(ref(db, `products/${p.id}`));
-        showToast("Product Deleted", `"${p.name}" removed from database.`, "info");
+        showToast("Menu Dihapus", `"${p.name}" telah dihapus dari daftar.`, "info");
       } catch (err) {
-        alert("Error deleting product: " + err);
+        alert("Gagal menghapus menu: " + err);
       }
     }
   };
@@ -420,7 +423,7 @@ export default function IndigoPOSDashboard() {
 
     const qty = parseInt(stockQtyInput);
     if (!qty || qty <= 0) {
-      alert("Please enter a valid quantity");
+      alert("Masukkan jumlah unit yang valid");
       return;
     }
 
@@ -444,14 +447,14 @@ export default function IndigoPOSDashboard() {
         quantity: qty,
         previousStock: prevStock,
         currentStock: newStock,
-        notes: stockNotesInput || (stockModalType === "IN" ? "Vendor Delivery" : "Damaged / Waste"),
-        createdBy: "Mario Sitepu",
+        notes: stockNotesInput || (stockModalType === "IN" ? "Restock dari Supplier" : "Barang Rusak / Basi"),
+        createdBy: "Mario Sitepu (Pemilik)",
         timestamp: now,
       });
 
       showToast(
-        stockModalType === "IN" ? "Stock Adjusted (+)" : "Stock Adjusted (-)",
-        `${selectedStockProduct.name} stock updated to ${newStock} units.`
+        stockModalType === "IN" ? "Stok Berhasil Ditambah" : "Stok Disesuaikan",
+        `Stok ${selectedStockProduct.name} saat ini menjadi ${newStock} unit.`
       );
 
       setIsStockModalOpen(false);
@@ -459,7 +462,7 @@ export default function IndigoPOSDashboard() {
       setStockQtyInput("");
       setStockNotesInput("");
     } catch (err) {
-      alert("Error updating stock: " + err);
+      alert("Gagal memperbarui stok: " + err);
     }
   };
 
@@ -476,7 +479,7 @@ export default function IndigoPOSDashboard() {
         </div>
       )}
 
-      {/* ================= FIGMA SIDEBAR NAVIGATION ================= */}
+      {/* ================= SIDEBAR NAVIGATION ================= */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between shrink-0 shadow-sm">
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-2">
@@ -486,7 +489,7 @@ export default function IndigoPOSDashboard() {
             <div>
               <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-none">Indigo POS</h1>
               <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full mt-1 inline-block border border-indigo-100">
-                UMKM Edition
+                Edisi UMKM & Kafe
               </span>
             </div>
           </div>
@@ -501,7 +504,7 @@ export default function IndigoPOSDashboard() {
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard Overview</span>
+              <span>Ringkasan Penjualan</span>
             </button>
 
             <button
@@ -513,7 +516,7 @@ export default function IndigoPOSDashboard() {
               }`}
             >
               <UtensilsCrossed className="w-4 h-4" />
-              <span>Menu Management</span>
+              <span>Manajemen Menu</span>
               <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
                 {products.length}
               </span>
@@ -528,7 +531,7 @@ export default function IndigoPOSDashboard() {
               }`}
             >
               <Boxes className="w-4 h-4" />
-              <span>Inventory & Stock</span>
+              <span>Stok & Inventori</span>
               {metrics.lowStockCount > 0 && (
                 <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold border border-rose-100">
                   {metrics.lowStockCount}
@@ -545,7 +548,7 @@ export default function IndigoPOSDashboard() {
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>Sales Reports</span>
+              <span>Laporan Keuangan</span>
             </button>
           </nav>
         </div>
@@ -557,7 +560,7 @@ export default function IndigoPOSDashboard() {
             </div>
             <div className="text-left overflow-hidden">
               <p className="text-xs font-bold text-slate-900 truncate">Mario Sitepu</p>
-              <p className="text-[11px] text-slate-500 truncate">Store Owner</p>
+              <p className="text-[11px] text-slate-500 truncate">Pemilik Usaha</p>
             </div>
           </div>
         </div>
@@ -568,15 +571,15 @@ export default function IndigoPOSDashboard() {
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              {activeTab === "overview" && "Dashboard Overview"}
-              {activeTab === "menu" && "Menu Management"}
-              {activeTab === "inventory" && "Inventory & Stock"}
-              {activeTab === "reports" && "Sales Reports"}
+              {activeTab === "overview" && "Ringkasan Penjualan"}
+              {activeTab === "menu" && "Manajemen Menu & Harga"}
+              {activeTab === "inventory" && "Stok & Kartu Mutasi"}
+              {activeTab === "reports" && "Laporan Keuangan"}
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
               <p className="text-xs text-emerald-700 font-bold">
-                Firebase Realtime Database Synced: kasir-catat
+                Terhubung Otomatis ke Tablet Kasir (Data Terkini)
               </p>
             </div>
           </div>
@@ -588,13 +591,13 @@ export default function IndigoPOSDashboard() {
                   setSelectedStockProduct(products[0]);
                   setStockModalType("IN");
                   setStockQtyInput("");
-                  setStockNotesInput("Restock");
+                  setStockNotesInput("Restock dari Supplier");
                   setIsStockModalOpen(true);
                 }
               }}
               className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-sm transition-all"
             >
-              + Add Stock
+              + Tambah Stok
             </button>
             <button
               onClick={() => {
@@ -603,7 +606,7 @@ export default function IndigoPOSDashboard() {
                   name: "",
                   sku: `SKU-${Date.now().toString().slice(-4)}`,
                   price: "",
-                  category: "Drinks",
+                  category: "Minuman",
                   stockQuantity: "50",
                   imageUrl: "",
                   isActive: true,
@@ -613,66 +616,66 @@ export default function IndigoPOSDashboard() {
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-200 transition-all flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>New Product / Menu</span>
+              <span>+ Menu Baru</span>
             </button>
           </div>
         </header>
 
-        {/* ================= SCREEN 1: DASHBOARD OVERVIEW ================= */}
+        {/* ================= SCREEN 1: RINGKASAN ================= */}
         {activeTab === "overview" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Today's Sales</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Penjualan Hari Ini</span>
                   <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    +12% vs yesterday
+                    +12% dibanding kemarin
                   </span>
                 </div>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
                   {formatIDR(metrics.todaySales || 1240000)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Updated just now</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Diperbarui realtime</p>
               </div>
 
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Orders</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Transaksi</span>
                   <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    +5% vs yesterday
+                    +5% dibanding kemarin
                   </span>
                 </div>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
-                  {metrics.todayOrders || 48} Orders
+                  {metrics.todayOrders || 48} Struk Kasir
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">From POS Android Tablet</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Dari Tablet Kasir Android</p>
               </div>
 
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Top Selling Item</span>
-                  <span className="text-xs text-indigo-600 font-bold">★ #1</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Menu Paling Laris</span>
+                  <span className="text-xs text-indigo-600 font-bold">★ Terlaris</span>
                 </div>
                 <div className="text-lg font-extrabold text-slate-900 tracking-tight mt-3 truncate">
                   {metrics.topItem.name}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">{metrics.topItem.qty || 24} units sold</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">{metrics.topItem.qty || 24} porsi terjual</p>
               </div>
 
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Low Stock Alerts</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stok Menipis</span>
                   <button
                     onClick={() => setActiveTab("inventory")}
                     className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
                   >
-                    View &rarr;
+                    Lihat &rarr;
                   </button>
                 </div>
                 <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3">
-                  {metrics.lowStockCount || 3} Items
+                  {metrics.lowStockCount || 3} Menu
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Require immediate restock</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Perlu restock segera</p>
               </div>
             </div>
 
@@ -680,11 +683,11 @@ export default function IndigoPOSDashboard() {
               <div className="lg:col-span-7 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-extrabold text-base text-slate-900">Sales Trend (Last 7 Days)</h3>
-                    <p className="text-xs text-slate-400">Revenue performance over the week</p>
+                    <h3 className="font-extrabold text-base text-slate-900">Tren Penjualan (7 Hari Terakhir)</h3>
+                    <p className="text-xs text-slate-400">Grafik performa pendapatan harian</p>
                   </div>
                   <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg">
-                    Weekly
+                    Mingguan
                   </span>
                 </div>
 
@@ -720,12 +723,12 @@ export default function IndigoPOSDashboard() {
 
               <div className="lg:col-span-5 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-extrabold text-base text-slate-900">Recent Transactions</h3>
+                  <h3 className="font-extrabold text-base text-slate-900">Transaksi Kasir Terbaru</h3>
                   <button
                     onClick={() => setActiveTab("reports")}
                     className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
                   >
-                    View All
+                    Lihat Semua
                   </button>
                 </div>
 
@@ -747,13 +750,13 @@ export default function IndigoPOSDashboard() {
                       <div className="text-right">
                         <div className="font-extrabold text-xs text-slate-900">{formatIDR(t.grandTotal)}</div>
                         <span className="inline-block text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.2 rounded-full border border-emerald-100 mt-0.5">
-                          Success
+                          Sukses
                         </span>
                       </div>
                     </div>
                   ))}
                   {transactions.length === 0 && (
-                    <div className="py-8 text-center text-xs text-slate-400">No transactions recorded yet</div>
+                    <div className="py-8 text-center text-xs text-slate-400">Belum ada transaksi tercatat</div>
                   )}
                 </div>
               </div>
@@ -761,11 +764,12 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
 
-        {/* ================= SCREEN 2: MENU MANAGEMENT ================= */}
+        {/* ================= SCREEN 2: MANAJEMEN MENU (RATA KIRI LENGKAP) ================= */}
         {activeTab === "menu" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+            {/* Top Toolbar left-aligned */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-start gap-4">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
@@ -781,13 +785,13 @@ export default function IndigoPOSDashboard() {
                 ))}
               </div>
 
-              <div className="relative w-full sm:w-72">
+              <div className="relative w-full sm:w-80">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={menuSearch}
                   onChange={(e) => setMenuSearch(e.target.value)}
-                  placeholder="Search by name or category..."
+                  placeholder="Cari nama menu atau kategori..."
                   className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
                 />
               </div>
@@ -798,18 +802,22 @@ export default function IndigoPOSDashboard() {
                 <table className="w-full text-left text-sm text-slate-600">
                   <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-5">Image & Name</th>
-                      <th className="py-3.5 px-4">Category</th>
-                      <th className="py-3.5 px-4">Price</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Stock</th>
-                      <th className="py-3.5 px-5 text-right">Actions</th>
+                      <th className="py-3.5 px-5">Foto & Nama Menu</th>
+                      <th className="py-3.5 px-4">Kategori</th>
+                      <th className="py-3.5 px-4">Harga Jual</th>
+                      <th className="py-3.5 px-4">Status Kasir</th>
+                      <th className="py-3.5 px-4">Sisa Stok</th>
+                      <th className="py-3.5 px-5 text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-xs">
                     {products
                       .filter((p) => {
-                        const matchesCat = selectedCategory === "All" || p.category === selectedCategory;
+                        const matchesCat =
+                          selectedCategory === "Semua" ||
+                          (selectedCategory === "Minuman" && (p.category === "Minuman" || p.category === "Drinks")) ||
+                          (selectedCategory === "Makanan" && (p.category === "Makanan" || p.category === "Food" || p.category === "Makanan & Pastry")) ||
+                          (selectedCategory === "Snack" && (p.category === "Snack" || p.category === "Snacks"));
                         const matchesSearch =
                           (p.name || "").toLowerCase().includes(menuSearch.toLowerCase()) ||
                           (p.category || "").toLowerCase().includes(menuSearch.toLowerCase()) ||
@@ -842,10 +850,10 @@ export default function IndigoPOSDashboard() {
                                   : "bg-slate-100 text-slate-500 border-slate-200"
                               }`}
                             >
-                              {product.isActive !== false ? "Active" : "Inactive"}
+                              {product.isActive !== false ? "Aktif" : "Nonaktif"}
                             </button>
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-800">{product.stockQuantity ?? 50} units</td>
+                          <td className="py-3.5 px-4 font-bold text-slate-800">{product.stockQuantity ?? 50} unit</td>
                           <td className="py-3.5 px-5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
@@ -863,14 +871,14 @@ export default function IndigoPOSDashboard() {
                                   setIsEditProductOpen(true);
                                 }}
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                title="Edit Product"
+                                title="Edit Menu & Harga"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(product)}
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                title="Delete Product"
+                                title="Hapus Menu"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -884,45 +892,45 @@ export default function IndigoPOSDashboard() {
 
               <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  Showing 1 to {products.length} of {products.length} items
+                  Menampilkan 1 sampai {products.length} dari {products.length} menu
                 </span>
-                <span className="font-semibold text-slate-400">Page 1 of 1</span>
+                <span className="font-semibold text-slate-400">Halaman 1 dari 1</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* ================= SCREEN 3: INVENTORY & STOCK ================= */}
+        {/* ================= SCREEN 3: STOK & INVENTORI ================= */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="figma-card p-5">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Inventory Value</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Nilai Aset Stok</span>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
                   {formatIDR(metrics.totalInventoryValue)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Asset value across all menu items</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Estimasi nilai produk di outlet</p>
               </div>
 
               <div className="figma-card p-5 border-rose-200 bg-rose-50/20">
-                <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Items to Restock</span>
+                <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Menu Perlu Di-Restock</span>
                 <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3">
                   {metrics.lowStockCount}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Stock is below minimum threshold (&le;10)</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Sisa stok di bawah batas minimal (&le;10)</p>
               </div>
 
               <div className="figma-card p-5">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Categories</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori Menu Aktif</span>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
                   {categories.length - 1}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Drinks, Food, Snacks</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Minuman, Makanan, Snack</p>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-base text-slate-900">Stock Movement Log</h3>
+              <h3 className="font-extrabold text-base text-slate-900">Buku Mutasi Stok (Audit Log)</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -930,14 +938,14 @@ export default function IndigoPOSDashboard() {
                       setSelectedStockProduct(products[0]);
                       setStockModalType("IN");
                       setStockQtyInput("");
-                      setStockNotesInput("Vendor Delivery");
+                      setStockNotesInput("Restock dari Supplier");
                       setIsStockModalOpen(true);
                     }
                   }}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Adjust Stock</span>
+                  <span>+ Atur / Mutasi Stok</span>
                 </button>
               </div>
             </div>
@@ -947,19 +955,19 @@ export default function IndigoPOSDashboard() {
                 <table className="w-full text-left text-sm text-slate-600">
                   <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-5">Date & Time</th>
+                      <th className="py-3.5 px-5">Tanggal & Jam</th>
                       <th className="py-3.5 px-4">SKU</th>
-                      <th className="py-3.5 px-4">Item Name</th>
-                      <th className="py-3.5 px-4">Change</th>
-                      <th className="py-3.5 px-4">Updated By</th>
-                      <th className="py-3.5 px-5">Notes</th>
+                      <th className="py-3.5 px-4">Nama Menu</th>
+                      <th className="py-3.5 px-4">Perubahan</th>
+                      <th className="py-3.5 px-4">Petugas</th>
+                      <th className="py-3.5 px-5">Keterangan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-xs">
                     {inventoryLogs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center py-10 text-slate-400">
-                          No stock movements logged yet
+                          Belum ada catatan mutasi stok
                         </td>
                       </tr>
                     ) : (
@@ -980,11 +988,11 @@ export default function IndigoPOSDashboard() {
                                   : "text-slate-700 bg-slate-100"
                               }`}
                             >
-                              {log.type === "IN" ? `+${log.quantity}` : `-${log.quantity}`}
+                              {log.type === "IN" ? `+${log.quantity} (Masuk)` : `-${log.quantity} (Keluar)`}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">{log.createdBy || "Mario Sitepu"}</td>
-                          <td className="py-3.5 px-5 text-slate-500">{log.notes || "Vendor Delivery"}</td>
+                          <td className="py-3.5 px-5 text-slate-500">{log.notes || "Restock dari Supplier"}</td>
                         </tr>
                       ))
                     )}
@@ -995,13 +1003,13 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
 
-        {/* ================= SCREEN 4: SALES REPORTS ================= */}
+        {/* ================= SCREEN 4: LAPORAN KEUANGAN ================= */}
         {activeTab === "reports" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-extrabold text-base text-slate-900">Financial Breakdown & History</h3>
-                <p className="text-xs text-slate-500">Analyze payment distribution and audit detailed cashier receipts</p>
+                <h3 className="font-extrabold text-base text-slate-900">Rincian Finansial & Riwayat Kasir</h3>
+                <p className="text-xs text-slate-500">Analisis sebaran metode pembayaran dan audit struk transaksi</p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -1010,10 +1018,10 @@ export default function IndigoPOSDashboard() {
                   onChange={(e) => setReportDateFilter(e.target.value as any)}
                   className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="today">Today</option>
-                  <option value="7days">Last 7 Days</option>
-                  <option value="30days">Last 30 Days</option>
-                  <option value="all">All Time</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="7days">7 Hari Terakhir</option>
+                  <option value="30days">30 Hari Terakhir</option>
+                  <option value="all">Semua Waktu</option>
                 </select>
 
                 <button
@@ -1021,7 +1029,7 @@ export default function IndigoPOSDashboard() {
                   className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-sm transition-all flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Export CSV</span>
+                  <span>Unduh Laporan CSV</span>
                 </button>
               </div>
             </div>
@@ -1029,8 +1037,8 @@ export default function IndigoPOSDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900">Payment Methods</h3>
-                  <p className="text-xs text-slate-400">Share of total revenue</p>
+                  <h3 className="font-extrabold text-base text-slate-900">Metode Pembayaran</h3>
+                  <p className="text-xs text-slate-400">Porsi dari total pendapatan</p>
 
                   <div className="py-6 flex flex-col items-center justify-center">
                     <div className="relative w-44 h-44 flex items-center justify-center">
@@ -1061,7 +1069,7 @@ export default function IndigoPOSDashboard() {
                         />
                       </svg>
                       <div className="absolute text-center">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Revenue</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Omzet</span>
                         <span className="text-sm font-black text-slate-900 leading-tight">
                           {formatIDR(metrics.totalRev)}
                         </span>
@@ -1073,7 +1081,7 @@ export default function IndigoPOSDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full bg-indigo-600" />
-                        <span className="font-bold text-slate-700">QRIS</span>
+                        <span className="font-bold text-slate-700">QRIS Dinamis</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.qrisPct}%</span>
                     </div>
@@ -1081,7 +1089,7 @@ export default function IndigoPOSDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                        <span className="font-bold text-slate-700">Cash (Tunai)</span>
+                        <span className="font-bold text-slate-700">Tunai (Cash)</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.cashPct}%</span>
                     </div>
@@ -1089,7 +1097,7 @@ export default function IndigoPOSDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full bg-slate-300" />
-                        <span className="font-bold text-slate-700">Bank Transfer</span>
+                        <span className="font-bold text-slate-700">Transfer Bank</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.transferPct}%</span>
                     </div>
@@ -1099,19 +1107,19 @@ export default function IndigoPOSDashboard() {
 
               <div className="lg:col-span-8 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-extrabold text-base text-slate-900">Detailed Sales History</h3>
-                  <span className="text-xs text-slate-400">{transactions.length} Total Orders</span>
+                  <h3 className="font-extrabold text-base text-slate-900">Riwayat Transaksi Terperinci</h3>
+                  <span className="text-xs text-slate-400">{transactions.length} Total Transaksi</span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm text-slate-600">
                     <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Date & Time</th>
-                        <th className="py-3 px-4">Order ID</th>
-                        <th className="py-3 px-4">Items</th>
-                        <th className="py-3 px-4">Payment</th>
-                        <th className="py-3 px-4 text-right">Total</th>
+                        <th className="py-3 px-4">Tanggal & Jam</th>
+                        <th className="py-3 px-4">No. Invoice</th>
+                        <th className="py-3 px-4">Item Pesanan</th>
+                        <th className="py-3 px-4">Pembayaran</th>
+                        <th className="py-3 px-4 text-right">Total Bayar</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium text-xs">
@@ -1126,7 +1134,7 @@ export default function IndigoPOSDashboard() {
                             {tx.invoiceNumber || tx.id}
                           </td>
                           <td className="py-3 px-4 text-slate-700">
-                            {(tx.items || []).length} items
+                            {(tx.items || []).length} jenis menu
                           </td>
                           <td className="py-3 px-4">
                             <span
@@ -1153,16 +1161,16 @@ export default function IndigoPOSDashboard() {
         )}
       </main>
 
-      {/* ================= MODAL: ADD / EDIT PRODUCT ================= */}
+      {/* ================= MODAL: TAMBAH / EDIT MENU ================= */}
       {(isAddProductOpen || isEditProductOpen) && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-extrabold text-lg text-slate-900">
-                  {editingProduct ? "Edit Product" : "Add New Product"}
+                  {editingProduct ? "Edit Menu & Harga Jual" : "Tambah Menu Baru"}
                 </h3>
-                <p className="text-xs text-slate-400">Updates will sync in real-time to the POS tablet</p>
+                <p className="text-xs text-slate-400">Data akan tersinkronisasi otomatis ke Tablet Kasir</p>
               </div>
               <button
                 onClick={() => {
@@ -1177,58 +1185,58 @@ export default function IndigoPOSDashboard() {
 
             <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-medium">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Product Name *</label>
+                <label className="block font-bold text-slate-700 mb-1">Nama Menu *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Nasi Goreng Spesial"
+                  placeholder="Contoh: Kopi Susu Gula Aren"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Price (Rp) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Harga Jual (Rp) *</label>
                   <input
                     type="number"
                     required
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="35000"
+                    placeholder="18000"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-sm focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Category *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Kategori Menu *</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
                   >
-                    <option value="Drinks">Drinks</option>
-                    <option value="Food">Food</option>
-                    <option value="Snacks">Snacks</option>
+                    <option value="Minuman">Minuman</option>
+                    <option value="Makanan">Makanan</option>
+                    <option value="Snack">Cemilan & Snack</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">SKU</label>
+                  <label className="block font-bold text-slate-700 mb-1">SKU / Kode Barang</label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="SKU-8021"
+                    placeholder="KOP-01"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Initial Stock</label>
+                  <label className="block font-bold text-slate-700 mb-1">Stok Awal (Unit)</label>
                   <input
                     type="number"
                     value={formData.stockQuantity}
@@ -1240,7 +1248,7 @@ export default function IndigoPOSDashboard() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Image URL</label>
+                <label className="block font-bold text-slate-700 mb-1">URL Foto Menu</label>
                 <input
                   type="url"
                   value={formData.imageUrl}
@@ -1259,13 +1267,13 @@ export default function IndigoPOSDashboard() {
                   }}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-sm shadow-indigo-200"
                 >
-                  Save & Sync
+                  Simpan & Sinkronkan ke Tablet
                 </button>
               </div>
             </form>
@@ -1273,14 +1281,14 @@ export default function IndigoPOSDashboard() {
         </div>
       )}
 
-      {/* ================= MODAL: ADJUST STOCK ================= */}
+      {/* ================= MODAL: ATUR STOK ================= */}
       {isStockModalOpen && selectedStockProduct && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="font-extrabold text-base text-slate-900">Adjust Stock</h3>
-                <p className="text-xs text-slate-400">Recorded automatically in inventory log</p>
+                <h3 className="font-extrabold text-base text-slate-900">Atur Mutasi Stok</h3>
+                <p className="text-xs text-slate-400">Mutasi akan otomatis dicatat pada Audit Log</p>
               </div>
               <button
                 onClick={() => setIsStockModalOpen(false)}
@@ -1293,14 +1301,14 @@ export default function IndigoPOSDashboard() {
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
               <div>
                 <p className="font-bold text-slate-900">{selectedStockProduct.name}</p>
-                <p className="text-slate-400">Current: {selectedStockProduct.stockQuantity ?? 50} units</p>
+                <p className="text-slate-400">Sisa saat ini: {selectedStockProduct.stockQuantity ?? 50} unit</p>
               </div>
               <span className="font-mono font-bold text-indigo-600">{selectedStockProduct.sku || "-"}</span>
             </div>
 
             <form onSubmit={handleStockSubmit} className="space-y-4 text-xs font-medium">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Adjustment Type</label>
+                <label className="block font-bold text-slate-700 mb-1">Jenis Mutasi</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -1311,7 +1319,7 @@ export default function IndigoPOSDashboard() {
                         : "bg-white text-slate-600 border-slate-200"
                     }`}
                   >
-                    + Stock In (Restock)
+                    + Stok Masuk (Restock)
                   </button>
                   <button
                     type="button"
@@ -1322,31 +1330,31 @@ export default function IndigoPOSDashboard() {
                         : "bg-white text-slate-600 border-slate-200"
                     }`}
                   >
-                    - Stock Out (Waste)
+                    - Stok Keluar (Rusak/Basi)
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Quantity *</label>
+                <label className="block font-bold text-slate-700 mb-1">Jumlah Unit *</label>
                 <input
                   type="number"
                   required
                   min="1"
                   value={stockQtyInput}
                   onChange={(e) => setStockQtyInput(e.target.value)}
-                  placeholder="e.g. 15"
+                  placeholder="Contoh: 20"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-base focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Notes / Vendor</label>
+                <label className="block font-bold text-slate-700 mb-1">Keterangan / No. Surat Jalan</label>
                 <input
                   type="text"
                   value={stockNotesInput}
                   onChange={(e) => setStockNotesInput(e.target.value)}
-                  placeholder="e.g. Vendor Delivery"
+                  placeholder="Contoh: Kiriman Supplier CV Mandiri"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -1357,13 +1365,13 @@ export default function IndigoPOSDashboard() {
                   onClick={() => setIsStockModalOpen(false)}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-sm shadow-indigo-200"
                 >
-                  Confirm Adjustment
+                  Konfirmasi Mutasi
                 </button>
               </div>
             </form>
@@ -1371,13 +1379,13 @@ export default function IndigoPOSDashboard() {
         </div>
       )}
 
-      {/* ================= MODAL: RECEIPT DETAILS ================= */}
+      {/* ================= MODAL: STRUK TRANSAKSI ================= */}
       {selectedTxDetail && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="font-extrabold text-base text-slate-900">Receipt Details</h3>
+                <h3 className="font-extrabold text-base text-slate-900">Rincian Struk Transaksi</h3>
                 <p className="text-xs text-slate-400 font-mono">{selectedTxDetail.invoiceNumber || selectedTxDetail.id}</p>
               </div>
               <button
@@ -1406,15 +1414,15 @@ export default function IndigoPOSDashboard() {
 
             <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3">
               <div className="flex justify-between text-slate-500">
-                <span>Date:</span>
+                <span>Waktu Pembelian:</span>
                 <span className="font-semibold text-slate-700">{formatDate(selectedTxDetail.createdAt)}</span>
               </div>
               <div className="flex justify-between text-slate-500">
-                <span>Payment:</span>
+                <span>Metode Bayar:</span>
                 <span className="font-bold text-indigo-600">{selectedTxDetail.paymentMethod}</span>
               </div>
               <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-100">
-                <span>Grand Total:</span>
+                <span>Total Bayar:</span>
                 <span>{formatIDR(selectedTxDetail.grandTotal)}</span>
               </div>
             </div>
@@ -1423,7 +1431,7 @@ export default function IndigoPOSDashboard() {
               onClick={() => setSelectedTxDetail(null)}
               className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs"
             >
-              Close
+              Tutup Struk
             </button>
           </div>
         </div>
