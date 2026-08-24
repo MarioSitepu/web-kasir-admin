@@ -138,7 +138,7 @@ export default function IndigoPOSDashboard() {
 
   // Modal: Hapus Database (Per Bulan / Reset Total)
   const [isDeleteMonthModalOpen, setIsDeleteMonthModalOpen] = useState(false);
-  const [deleteScope, setDeleteScope] = useState<"month" | "all_transactions" | "all_logs">("month");
+  const [deleteScope, setDeleteScope] = useState<"month" | "all_transactions" | "all_logs" | "reset_all">("month");
   const [monthToDelete, setMonthToDelete] = useState<string>("");
   const [isConfirmedCheckbox, setIsConfirmedCheckbox] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -294,12 +294,20 @@ export default function IndigoPOSDashboard() {
     });
   };
 
-  // Extract unique months from transactions (e.g., '2026-08', '2026-07')
+  // Extract unique months from transactions & inventory logs (e.g., '2026-08', '2026-07')
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
     transactions.forEach((t) => {
       if (t.createdAt) {
         const d = new Date(t.createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        monthSet.add(yyyy + "-" + mm);
+      }
+    });
+    inventoryLogs.forEach((l) => {
+      if (l.timestamp) {
+        const d = new Date(l.timestamp);
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         monthSet.add(yyyy + "-" + mm);
@@ -467,9 +475,13 @@ export default function IndigoPOSDashboard() {
         showToast("Database Transaksi Direset", "Seluruh riwayat transaksi kasir telah dikosongkan.", "info");
       } else if (deleteScope === "all_logs") {
         await remove(ref(db, "inventory_logs"));
-        showToast("Log Mutasi Direset", "Seluruh catatan mutasi stok telah dikosongkan.", "info");
+        showToast("Buku Mutasi Direset", "Seluruh catatan mutasi stok telah dikosongkan.", "info");
+      } else if (deleteScope === "reset_all") {
+        await remove(ref(db, "transactions"));
+        await remove(ref(db, "inventory_logs"));
+        showToast("Database Direset Total", "Seluruh transaksi dan catatan mutasi stok telah dikosongkan.", "info");
       } else {
-        // Delete by selected month
+        // Delete by selected month: Clears BOTH transactions AND inventory logs for that month
         const targetMonth = monthToDelete || availableMonths[0]?.key;
         if (!targetMonth) {
           alert("Pilih bulan yang ingin dihapus.");
@@ -484,19 +496,32 @@ export default function IndigoPOSDashboard() {
           return yyyy + "-" + mm === targetMonth;
         });
 
-        if (txToDelete.length === 0) {
-          alert("Tidak ada transaksi pada bulan yang dipilih.");
+        const logsToDelete = inventoryLogs.filter((l) => {
+          const d = new Date(l.timestamp);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          return yyyy + "-" + mm === targetMonth;
+        });
+
+        if (txToDelete.length === 0 && logsToDelete.length === 0) {
+          alert("Tidak ada data transaksi atau mutasi stok pada bulan " + targetMonth + ".");
           setIsDeleting(false);
           return;
         }
 
+        // Delete matching transactions
         for (const tx of txToDelete) {
           await remove(ref(db, "transactions/" + tx.id));
         }
 
+        // Delete matching inventory logs
+        for (const log of logsToDelete) {
+          await remove(ref(db, "inventory_logs/" + log.id));
+        }
+
         showToast(
-          "Data Bulan Terpilih Dihapus",
-          txToDelete.length + " transaksi bulan " + targetMonth + " berhasil dibersihkan dari Firebase.",
+          "Data Bulan " + targetMonth + " Dihapus",
+          txToDelete.length + " transaksi dan " + logsToDelete.length + " log mutasi berhasil dibersihkan.",
           "info"
         );
       }
@@ -1129,8 +1154,24 @@ export default function IndigoPOSDashboard() {
             </div>
 
             <div className="flex items-center justify-between w-full text-left">
-              <h3 className="font-extrabold text-base text-slate-900 text-left">Buku Mutasi Stok (Audit Log)</h3>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 text-left">Buku Mutasi Stok (Audit Log)</h3>
+                <p className="text-xs text-slate-500">Mencatat riwayat keluar-masuk dan restock barang</p>
+              </div>
               <div className="flex items-center gap-2">
+                {inventoryLogs.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setDeleteScope("all_logs");
+                      setIsConfirmedCheckbox(false);
+                      setIsDeleteMonthModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Bersihkan Log</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     if (products.length > 0) {
@@ -1141,7 +1182,7 @@ export default function IndigoPOSDashboard() {
                       setIsStockModalOpen(true);
                     }
                   }}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-200 transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Atur / Mutasi Stok</span>
@@ -1494,10 +1535,10 @@ export default function IndigoPOSDashboard() {
 
             <div className="space-y-3 text-xs text-left">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Pilih Tindakan Pembersihan:</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Pilih Data Yang Ingin Dihapus:</label>
                 <div className="grid grid-cols-1 gap-2">
                   <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "month" ? "bg-indigo-50/70 border-indigo-300 text-indigo-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                    deleteScope === "month" ? "bg-indigo-50/70 border-indigo-300 text-indigo-950 font-bold ring-1 ring-indigo-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
                   )}>
                     <input
                       type="radio"
@@ -1506,33 +1547,42 @@ export default function IndigoPOSDashboard() {
                       onChange={() => setDeleteScope("month")}
                       className="accent-indigo-600"
                     />
-                    <span>Hapus Transaksi Berdasarkan Bulan Tertentu</span>
+                    <div>
+                      <p className="font-bold text-xs">Hapus Transaksi & Mutasi Stok Per Bulan</p>
+                      <p className="text-[11px] text-slate-500 font-normal">Membersihkan struk dan catatan mutasi stok di bulan terpilih</p>
+                    </div>
                   </label>
 
                   <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "all_transactions" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
-                  )}>
-                    <input
-                      type="radio"
-                      name="delete_scope"
-                      checked={deleteScope === "all_transactions"}
-                      onChange={() => setDeleteScope("all_transactions")}
-                      className="accent-rose-600"
-                    />
-                    <span>Hapus SEMUA Riwayat Transaksi ({transactions.length} Transaksi)</span>
-                  </label>
-
-                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "all_logs" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                    deleteScope === "all_logs" ? "bg-amber-50/70 border-amber-300 text-amber-950 font-bold ring-1 ring-amber-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
                   )}>
                     <input
                       type="radio"
                       name="delete_scope"
                       checked={deleteScope === "all_logs"}
                       onChange={() => setDeleteScope("all_logs")}
+                      className="accent-amber-600"
+                    />
+                    <div>
+                      <p className="font-bold text-xs">Hapus SEMUA Buku Mutasi Stok ({inventoryLogs.length} Log)</p>
+                      <p className="text-[11px] text-slate-500 font-normal">Mengosongkan seluruh riwayat keluar-masuk stok barang</p>
+                    </div>
+                  </label>
+
+                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
+                    deleteScope === "reset_all" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold ring-1 ring-rose-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                  )}>
+                    <input
+                      type="radio"
+                      name="delete_scope"
+                      checked={deleteScope === "reset_all"}
+                      onChange={() => setDeleteScope("reset_all")}
                       className="accent-rose-600"
                     />
-                    <span>Hapus SEMUA Catatan Mutasi Stok ({inventoryLogs.length} Log)</span>
+                    <div>
+                      <p className="font-bold text-xs">Reset Total (Semua Transaksi & Mutasi Stok)</p>
+                      <p className="text-[11px] text-slate-500 font-normal">Mengosongkan riwayat kasir & log mutasi ({transactions.length} Transaksi, {inventoryLogs.length} Log)</p>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -1546,14 +1596,19 @@ export default function IndigoPOSDashboard() {
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     {availableMonths.map((m) => {
-                      const count = transactions.filter(t => {
+                      const txCount = transactions.filter((t) => {
                         const d = new Date(t.createdAt);
+                        const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+                        return k === m.key;
+                      }).length;
+                      const logCount = inventoryLogs.filter((l) => {
+                        const d = new Date(l.timestamp);
                         const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
                         return k === m.key;
                       }).length;
                       return (
                         <option key={m.key} value={m.key}>
-                          {m.label} ({count} Data Transaksi)
+                          {m.label} ({txCount} Transaksi, {logCount} Mutasi Stok)
                         </option>
                       );
                     })}
