@@ -136,10 +136,11 @@ export default function IndigoPOSDashboard() {
   const [stockNotesInput, setStockNotesInput] = useState("");
   const [selectedTxDetail, setSelectedTxDetail] = useState<Transaction | null>(null);
 
-  // Modal: Hapus Database Per Bulan
+  // Modal: Hapus Database (Per Bulan / Reset Total)
   const [isDeleteMonthModalOpen, setIsDeleteMonthModalOpen] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"month" | "all_transactions" | "all_logs">("month");
   const [monthToDelete, setMonthToDelete] = useState<string>("");
-  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isConfirmedCheckbox, setIsConfirmedCheckbox] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Toast State
@@ -457,48 +458,53 @@ export default function IndigoPOSDashboard() {
     showToast("Laporan Berhasil Diunduh", "File CSV periode terpilih telah tersimpan di komputer Anda.");
   };
 
-  // Function to delete transactions for a specific month
+  // Function to delete database records (by month or total reset)
   const handleDeleteMonthTransactions = async () => {
-    if (!monthToDelete) {
-      alert("Silakan pilih bulan yang ingin dihapus datanya.");
-      return;
-    }
-
-    if (confirmDeleteText.trim().toUpperCase() !== "HAPUS") {
-      alert('Ketik kata "HAPUS" untuk mengonfirmasi penghapusan data secara permanen.');
-      return;
-    }
-
-    const txToDelete = transactions.filter((t) => {
-      const d = new Date(t.createdAt);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      return yyyy + "-" + mm === monthToDelete;
-    });
-
-    if (txToDelete.length === 0) {
-      alert("Tidak ada data transaksi pada bulan yang dipilih.");
-      return;
-    }
-
     setIsDeleting(true);
     try {
-      // Remove all selected transactions from Firebase RTDB
-      for (const tx of txToDelete) {
-        await remove(ref(db, "transactions/" + tx.id));
+      if (deleteScope === "all_transactions") {
+        await remove(ref(db, "transactions"));
+        showToast("Database Transaksi Direset", "Seluruh riwayat transaksi kasir telah dikosongkan.", "info");
+      } else if (deleteScope === "all_logs") {
+        await remove(ref(db, "inventory_logs"));
+        showToast("Log Mutasi Direset", "Seluruh catatan mutasi stok telah dikosongkan.", "info");
+      } else {
+        // Delete by selected month
+        const targetMonth = monthToDelete || availableMonths[0]?.key;
+        if (!targetMonth) {
+          alert("Pilih bulan yang ingin dihapus.");
+          setIsDeleting(false);
+          return;
+        }
+
+        const txToDelete = transactions.filter((t) => {
+          const d = new Date(t.createdAt);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          return yyyy + "-" + mm === targetMonth;
+        });
+
+        if (txToDelete.length === 0) {
+          alert("Tidak ada transaksi pada bulan yang dipilih.");
+          setIsDeleting(false);
+          return;
+        }
+
+        for (const tx of txToDelete) {
+          await remove(ref(db, "transactions/" + tx.id));
+        }
+
+        showToast(
+          "Data Bulan Terpilih Dihapus",
+          txToDelete.length + " transaksi bulan " + targetMonth + " berhasil dibersihkan dari Firebase.",
+          "info"
+        );
       }
 
-      showToast(
-        "Database Berhasil Direset",
-        txToDelete.length + " data transaksi bulan " + monthToDelete + " telah dihapus permanen.",
-        "info"
-      );
-
       setIsDeleteMonthModalOpen(false);
-      setMonthToDelete("");
-      setConfirmDeleteText("");
+      setIsConfirmedCheckbox(false);
     } catch (err) {
-      alert("Gagal menghapus data: " + err);
+      alert("Gagal menghapus data dari Firebase: " + err);
     } finally {
       setIsDeleting(false);
     }
@@ -1234,8 +1240,9 @@ export default function IndigoPOSDashboard() {
                   </div>
                   <button
                     onClick={() => {
+                      setDeleteScope("month");
                       setMonthToDelete(availableMonths[0]?.key || "");
-                      setConfirmDeleteText("");
+                      setIsConfirmedCheckbox(false);
                       setIsDeleteMonthModalOpen(true);
                     }}
                     className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs shadow-xs transition-all flex items-center gap-1.5"
@@ -1447,18 +1454,18 @@ export default function IndigoPOSDashboard() {
         )}
       </main>
 
-      {/* ================= MODAL: HAPUS DATABASE PER BULAN ================= */}
+      {/* ================= MODAL: HAPUS / BERSIHKAN DATABASE ================= */}
       {isDeleteMonthModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
-              <div className="flex items-center gap-2 text-left">
-                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
+              <div className="flex items-center gap-2.5 text-left">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 text-left">Hapus Transaksi Per Bulan</h3>
-                  <p className="text-xs text-slate-400 text-left">Membersihkan storage database lama</p>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Bersihkan / Hapus Data Firebase</h3>
+                  <p className="text-xs text-slate-500 text-left">Kelola dan hemat ruang penyimpanan database</p>
                 </div>
               </div>
               <button
@@ -1469,47 +1476,78 @@ export default function IndigoPOSDashboard() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-left">
-              <p className="text-slate-600 leading-relaxed">
-                Pilih bulan yang ingin dihapus datanya dari Firebase Realtime Database. Tindakan ini akan <strong>menghapus struk transaksi secara permanen</strong> untuk mengosongkan ruang storage.
-              </p>
+            <div className="space-y-3.5 text-xs text-left">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Pilih Data Yang Ingin Dihapus:</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
+                    deleteScope === "month" ? "bg-indigo-50/70 border-indigo-300 text-indigo-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                  )}>
+                    <input
+                      type="radio"
+                      name="delete_scope"
+                      checked={deleteScope === "month"}
+                      onChange={() => setDeleteScope("month")}
+                      className="accent-indigo-600"
+                    />
+                    <span>Hapus Transaksi Berdasarkan Bulan Tertentu</span>
+                  </label>
 
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1">Pilih Bulan Yang Akan Dihapus:</label>
-                <select
-                  value={monthToDelete}
-                  onChange={(e) => setMonthToDelete(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
-                >
-                  {availableMonths.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label} ({transactions.filter(t => {
+                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
+                    deleteScope === "all_transactions" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                  )}>
+                    <input
+                      type="radio"
+                      name="delete_scope"
+                      checked={deleteScope === "all_transactions"}
+                      onChange={() => setDeleteScope("all_transactions")}
+                      className="accent-rose-600"
+                    />
+                    <span>Hapus SEMUA Riwayat Transaksi (Reset Transaksi Kasir)</span>
+                  </label>
+                </div>
+              </div>
+
+              {deleteScope === "month" && (
+                <div className="text-left bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <label className="block font-bold text-slate-700 mb-1.5">Pilih Bulan Transaksi:</label>
+                  <select
+                    value={monthToDelete || (availableMonths[0]?.key || "")}
+                    onChange={(e) => setMonthToDelete(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    {availableMonths.map((m) => {
+                      const count = transactions.filter(t => {
                         const d = new Date(t.createdAt);
                         const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
                         return k === m.key;
-                      }).length} Transaksi)
-                    </option>
-                  ))}
-                </select>
+                      }).length;
+                      return (
+                        <option key={m.key} value={m.key}>
+                          {m.label} ({count} Data Transaksi)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] leading-relaxed">
+                <p className="font-bold">?? Perhatian:</p>
+                <p>Data yang dihapus dari Firebase tidak dapat dikembalikan. Pastikan Anda telah mengunduh file CSV laporan keuangan terlebih dahulu jika ingin mengarsipkan.</p>
               </div>
 
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] space-y-1">
-                <p className="font-bold">?? Peringatan Keamanan Data:</p>
-                <p>Pastikan Anda telah mengunduh laporan CSV sebelum menghapus data transaksi bulan ini.</p>
-              </div>
-
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1">
-                  Ketik kata <span className="text-rose-600 font-black">HAPUS</span> untuk konfirmasi:
-                </label>
+              <label className="flex items-start gap-2.5 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-slate-800 font-bold">
                 <input
-                  type="text"
-                  value={confirmDeleteText}
-                  onChange={(e) => setConfirmDeleteText(e.target.value)}
-                  placeholder="Ketik HAPUS"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-bold focus:outline-none focus:border-rose-500"
+                  type="checkbox"
+                  checked={isConfirmedCheckbox}
+                  onChange={(e) => setIsConfirmedCheckbox(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-rose-600 accent-rose-600 cursor-pointer"
                 />
-              </div>
+                <span className="text-xs font-bold leading-tight">
+                  Saya mengonfirmasi ingin menghapus data ini dari database.
+                </span>
+              </label>
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
@@ -1522,11 +1560,11 @@ export default function IndigoPOSDashboard() {
               </button>
               <button
                 type="button"
-                disabled={isDeleting || confirmDeleteText.trim().toUpperCase() !== "HAPUS"}
+                disabled={isDeleting || !isConfirmedCheckbox}
                 onClick={handleDeleteMonthTransactions}
                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-white shadow-sm shadow-rose-200 text-xs flex items-center gap-1.5"
               >
-                {isDeleting ? "Menghapus..." : "Hapus Permanen"}
+                {isDeleting ? "Menghapus..." : "Hapus Data Sekarang"}
               </button>
             </div>
           </div>
