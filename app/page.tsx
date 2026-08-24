@@ -382,7 +382,7 @@ export default function IndigoPOSDashboard() {
     const sortedItems = Object.entries(itemMap)
       .map(([name, stat]) => ({ name, ...stat }))
       .sort((a, b) => b.qty - a.qty);
-    const topItem = sortedItems[0] || (products[0] ? { name: products[0].name, qty: 24, revenue: products[0].price * 24 } : { name: "Kopi Susu Gula Aren", qty: 24, revenue: 432000 });
+    const topItem = sortedItems[0] || (products[0] ? { name: products[0].name, qty: 0, revenue: 0 } : { name: "Belum Ada Penjualan", qty: 0, revenue: 0 });
 
     let cashTotal = 0;
     let qrisTotal = 0;
@@ -833,7 +833,7 @@ export default function IndigoPOSDashboard() {
                   </span>
                 </div>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
-                  {formatIDR(metrics.todaySales || 1240000)}
+                  {formatIDR(metrics.todaySales)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1 font-medium text-left">Diperbarui realtime</p>
               </div>
@@ -846,7 +846,7 @@ export default function IndigoPOSDashboard() {
                   </span>
                 </div>
                 <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
-                  {metrics.todayOrders || 48} Struk Kasir
+                  {metrics.todayOrders} Struk Kasir
                 </div>
                 <p className="text-xs text-slate-400 mt-1 font-medium text-left">Dari Tablet Kasir Android</p>
               </div>
@@ -859,7 +859,7 @@ export default function IndigoPOSDashboard() {
                 <div className="text-lg font-extrabold text-slate-900 tracking-tight mt-3 truncate text-left">
                   {metrics.topItem.name}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium text-left">{metrics.topItem.qty || 24} porsi terjual</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">{metrics.topItem.qty > 0 ? metrics.topItem.qty + " porsi terjual" : "0 transaksi"}</p>
               </div>
 
               <div className="figma-card p-5 text-left">
@@ -873,7 +873,7 @@ export default function IndigoPOSDashboard() {
                   </button>
                 </div>
                 <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3 text-left">
-                  {metrics.lowStockCount || 3} Menu
+                  {metrics.lowStockCount} Menu
                 </div>
                 <p className="text-xs text-slate-400 mt-1 font-medium text-left">Perlu restock segera</p>
               </div>
@@ -1464,8 +1464,8 @@ export default function IndigoPOSDashboard() {
                   <Trash2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 text-left">Bersihkan / Hapus Data Firebase</h3>
-                  <p className="text-xs text-slate-500 text-left">Kelola dan hemat ruang penyimpanan database</p>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Kelola & Bersihkan Database</h3>
+                  <p className="text-xs text-slate-500 text-left">Pilih kategori data yang ingin dihapus</p>
                 </div>
               </div>
               <button
@@ -1476,9 +1476,25 @@ export default function IndigoPOSDashboard() {
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs text-left">
+            {/* Live Database Info Summary */}
+            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
+              <div className="p-1">
+                <span className="text-[10px] text-slate-500 font-bold block">Transaksi</span>
+                <strong className="text-xs text-slate-900">{transactions.length} Data</strong>
+              </div>
+              <div className="p-1 border-x border-slate-200">
+                <span className="text-[10px] text-slate-500 font-bold block">Log Mutasi</span>
+                <strong className="text-xs text-slate-900">{inventoryLogs.length} Log</strong>
+              </div>
+              <div className="p-1">
+                <span className="text-[10px] text-slate-500 font-bold block">Menu Menu</span>
+                <strong className="text-xs text-slate-900">{products.length} Menu</strong>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-left">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Pilih Data Yang Ingin Dihapus:</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Pilih Tindakan Pembersihan:</label>
                 <div className="grid grid-cols-1 gap-2">
                   <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
                     deleteScope === "month" ? "bg-indigo-50/70 border-indigo-300 text-indigo-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
@@ -1503,7 +1519,20 @@ export default function IndigoPOSDashboard() {
                       onChange={() => setDeleteScope("all_transactions")}
                       className="accent-rose-600"
                     />
-                    <span>Hapus SEMUA Riwayat Transaksi (Reset Transaksi Kasir)</span>
+                    <span>Hapus SEMUA Riwayat Transaksi ({transactions.length} Transaksi)</span>
+                  </label>
+
+                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
+                    deleteScope === "all_logs" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
+                  )}>
+                    <input
+                      type="radio"
+                      name="delete_scope"
+                      checked={deleteScope === "all_logs"}
+                      onChange={() => setDeleteScope("all_logs")}
+                      className="accent-rose-600"
+                    />
+                    <span>Hapus SEMUA Catatan Mutasi Stok ({inventoryLogs.length} Log)</span>
                   </label>
                 </div>
               </div>
@@ -1537,7 +1566,7 @@ export default function IndigoPOSDashboard() {
                 <p>Data yang dihapus dari Firebase tidak dapat dikembalikan. Pastikan Anda telah mengunduh file CSV laporan keuangan terlebih dahulu jika ingin mengarsipkan.</p>
               </div>
 
-              <label className="flex items-start gap-2.5 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-slate-800 font-bold">
+              <label className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-slate-800 font-bold">
                 <input
                   type="checkbox"
                   checked={isConfirmedCheckbox}
