@@ -37,8 +37,23 @@ import {
   Database,
   HardDrive,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  RefreshCw,
+  ImageIcon,
+  Link as LinkIcon
 } from "lucide-react";
+
+
+// Helper to auto-generate SKU based on category
+const generateSKU = (cat: string) => {
+  let prefix = "MIN";
+  const c = (cat || "").toLowerCase();
+  if (c.includes("makan") || c.includes("food")) prefix = "MAK";
+  else if (c.includes("snack") || c.includes("cemilan")) prefix = "SNK";
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  return prefix + "-" + randomNum;
+};
 
 // Robust parsing supporting Flutter & Web database formats
 const parseProduct = (key: string, val: any): Product => {
@@ -129,6 +144,50 @@ export default function IndigoPOSDashboard() {
 
   // Toast State
   const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; type?: "success" | "info" | "danger" } | null>(null);
+
+  
+  // Image Upload Mode: 'upload' | 'url'
+  const [imageUploadMode, setImageUploadMode] = useState<"upload" | "url">("upload");
+
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 10MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 500;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        setFormData((prev) => ({ ...prev, imageUrl: compressedDataUrl }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const showToast = (title: string, desc: string, type: "success" | "info" | "danger" = "success") => {
     setToastMsg({ title, desc, type });
@@ -739,7 +798,7 @@ export default function IndigoPOSDashboard() {
                 setEditingProduct(null);
                 setFormData({
                   name: "",
-                  sku: "SKU-" + Date.now().toString().slice(-4),
+                  sku: generateSKU("Minuman"),
                   price: "",
                   category: "Minuman",
                   stockQuantity: "50",
@@ -1534,13 +1593,24 @@ export default function IndigoPOSDashboard() {
 
               <div className="grid grid-cols-2 gap-3 text-left">
                 <div className="text-left">
-                  <label className="block font-bold text-slate-700 mb-1 text-left">SKU / Kode Barang</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700 text-left">Kode Barang (SKU)</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, sku: generateSKU(formData.category) })}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
+                      title="Acak / Buat Kode Baru"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Auto</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="KOP-01"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500 text-left"
+                    placeholder="MIN-4821"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-indigo-500 text-left"
                   />
                 </div>
 
@@ -1556,15 +1626,78 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1 text-left">URL Foto Menu</label>
-                <input
-                  type="url"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
-                />
+              {/* Enhanced Image Section: Upload File or URL */}
+              <div className="text-left space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700 text-left">Foto Menu Produk</label>
+                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setImageUploadMode("upload")}
+                      className={"px-2.5 py-1 rounded-md font-bold transition-all " + (
+                        imageUploadMode === "upload" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"
+                      )}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageUploadMode("url")}
+                      className={"px-2.5 py-1 rounded-md font-bold transition-all " + (
+                        imageUploadMode === "url" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"
+                      )}
+                    >
+                      URL Web
+                    </button>
+                  </div>
+                </div>
+
+                {imageUploadMode === "upload" ? (
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/20 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col items-center justify-center text-center group">
+                      <Upload className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 mb-1 transition-colors" />
+                      <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-600">
+                        Klik untuk Pilih Foto dari Laptop
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WebP (Otomatis Dioptimasi)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {formData.imageUrl && (
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                        <img
+                          src={formData.imageUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="url"
+                      value={formData.imageUrl}
+                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left text-xs"
+                    />
+                    {formData.imageUrl && (
+                      <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                        <img
+                          src={formData.imageUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
