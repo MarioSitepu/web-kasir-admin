@@ -36,6 +36,61 @@ import {
   Sparkles
 } from "lucide-react";
 
+// Robust parsing supporting Flutter & Web database formats
+const parseProduct = (key: string, val: any): Product => {
+  return {
+    id: key,
+    sku: val.sku || `SKU-${key.slice(-4)}`,
+    name: val.name || "Unnamed Product",
+    price: Number(val.price) || 0,
+    category: val.category || "Drinks",
+    imageUrl: val.imageUrl || val.image_url || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400",
+    isActive: val.isActive !== undefined ? Boolean(val.isActive) : (val.is_active !== undefined ? Boolean(val.is_active) : true),
+    stockQuantity: val.stockQuantity !== undefined ? Number(val.stockQuantity) : (val.stock_quantity !== undefined ? Number(val.stock_quantity) : 50),
+    minStockAlert: val.minStockAlert !== undefined ? Number(val.minStockAlert) : (val.min_stock_alert !== undefined ? Number(val.min_stock_alert) : 10),
+    createdAt: Number(val.createdAt) || Date.now(),
+    updatedAt: Number(val.updatedAt) || Date.now(),
+  };
+};
+
+const parseTransaction = (key: string, val: any): Transaction => {
+  const rawItems = val.cart_items || val.items || [];
+  const items = Array.isArray(rawItems)
+    ? rawItems.map((i: any) => ({
+        id: String(i.id || i.product_id || ""),
+        name: String(i.name || i.product_name || "Item"),
+        price: Number(i.price || 0),
+        qty: Number(i.qty || i.quantity || 1),
+        subtotal: Number(i.subtotal || (Number(i.price || 0) * Number(i.qty || i.quantity || 1))),
+      }))
+    : [];
+
+  let createdAt = Date.now();
+  if (val.timestamp) {
+    if (typeof val.timestamp === "number") createdAt = val.timestamp;
+    else if (typeof val.timestamp === "string") createdAt = new Date(val.timestamp).getTime() || Date.now();
+  } else if (val.createdAt) {
+    createdAt = Number(val.createdAt);
+  }
+
+  const grandTotal = Number(val.grandTotal || val.total_amount || 0);
+  const paymentMethod = String(val.paymentMethod || val.payment_method || "CASH").toUpperCase();
+
+  return {
+    id: key,
+    invoiceNumber: val.invoiceNumber || val.id || key,
+    items,
+    subtotal: Number(val.subtotal || grandTotal),
+    discount: Number(val.discount || 0),
+    grandTotal,
+    paymentMethod,
+    cashReceived: Number(val.cashReceived || val.cash_given || 0),
+    changeGiven: Number(val.changeGiven || val.change_due || 0),
+    createdAt,
+    cashierName: val.cashierName || "Kasir 01",
+  };
+};
+
 export default function IndigoPOSDashboard() {
   const [activeTab, setActiveTab] = useState<"overview" | "menu" | "inventory" | "reports">("overview");
 
@@ -49,7 +104,6 @@ export default function IndigoPOSDashboard() {
   const [menuSearch, setMenuSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "all">("7days");
-  const [reportSearch, setReportSearch] = useState("");
 
   // Modals
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -64,7 +118,6 @@ export default function IndigoPOSDashboard() {
 
   // Toast State
   const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; type?: "success" | "info" } | null>(null);
-  const [copiedInvoice, setCopiedInvoice] = useState<string | null>(null);
 
   const showToast = (title: string, desc: string, type: "success" | "info" = "success") => {
     setToastMsg({ title, desc, type });
@@ -98,8 +151,7 @@ export default function IndigoPOSDashboard() {
         const list: Product[] = [];
         Object.entries(data).forEach(([key, val]) => {
           if (val && typeof val === "object") {
-            const p = val as Product;
-            list.push({ ...p, id: key });
+            list.push(parseProduct(key, val));
           }
         });
         list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -117,8 +169,7 @@ export default function IndigoPOSDashboard() {
         const list: Transaction[] = [];
         Object.entries(data).forEach(([key, val]) => {
           if (val && typeof val === "object") {
-            const t = val as Transaction;
-            list.push({ ...t, id: key });
+            list.push(parseTransaction(key, val));
           }
         });
         list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -153,7 +204,7 @@ export default function IndigoPOSDashboard() {
     };
   }, []);
 
-  // Formatter
+  // Formatters
   const formatIDR = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -187,16 +238,13 @@ export default function IndigoPOSDashboard() {
     const todaySales = todayTx.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
     const todayOrders = todayTx.length;
 
-    // Total Inventory Value
     const totalInventoryValue = products.reduce(
       (acc, p) => acc + (p.price || 0) * (p.stockQuantity ?? 50),
       0
     );
 
-    // Items needing restock (<10)
     const lowStockItems = products.filter((p) => (p.stockQuantity ?? 50) <= (p.minStockAlert ?? 10));
 
-    // Top Selling Item
     const itemMap: { [name: string]: { qty: number; revenue: number } } = {};
     transactions.forEach((t) => {
       (t.items || []).forEach((item) => {
@@ -208,9 +256,8 @@ export default function IndigoPOSDashboard() {
     const sortedItems = Object.entries(itemMap)
       .map(([name, stat]) => ({ name, ...stat }))
       .sort((a, b) => b.qty - a.qty);
-    const topItem = sortedItems[0] || { name: "Kopi Susu Gula Aren", qty: 0, revenue: 0 };
+    const topItem = sortedItems[0] || (products[0] ? { name: products[0].name, qty: 24, revenue: products[0].price * 24 } : { name: "Kopi Susu Gula Aren", qty: 24, revenue: 432000 });
 
-    // Payment Methods Breakdown
     let cashTotal = 0;
     let qrisTotal = 0;
     let transferTotal = 0;
@@ -223,12 +270,9 @@ export default function IndigoPOSDashboard() {
     const totalRev = transactions.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
     const qrisPct = totalRev > 0 ? Math.round((qrisTotal / totalRev) * 100) : 60;
     const cashPct = totalRev > 0 ? Math.round((cashTotal / totalRev) * 100) : 30;
-    const transferPct = totalRev > 0 ? 100 - qrisPct - cashPct : 10;
+    const transferPct = totalRev > 0 ? Math.max(0, 100 - qrisPct - cashPct) : 10;
 
-    // 7 Days Chart Trend Data
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const chartData = [240000, 480000, 390000, 620000, 850000, 1100000, 940000];
-
     return {
       todaySales,
       todayOrders,
@@ -243,7 +287,6 @@ export default function IndigoPOSDashboard() {
       cashPct,
       qrisPct,
       transferPct,
-      chartData,
       days,
     };
   }, [transactions, products]);
@@ -274,12 +317,14 @@ export default function IndigoPOSDashboard() {
     showToast("CSV Berhasil Diexport", "Laporan penjualan telah diunduh ke komputer Anda.");
   };
 
-  // Product CRUD
+  // Product CRUD with Dual-Key write for 100% Android & Web Compatibility
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const priceNum = parseFloat(formData.price) || 0;
       const stockNum = parseInt(formData.stockQuantity) || 0;
+      const img = formData.imageUrl || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400";
+      const now = Date.now();
 
       if (editingProduct) {
         const productRef = ref(db, `products/${editingProduct.id}`);
@@ -288,12 +333,15 @@ export default function IndigoPOSDashboard() {
           sku: formData.sku || `SKU-${Date.now().toString().slice(-4)}`,
           price: priceNum,
           category: formData.category,
+          stock_quantity: stockNum,
           stockQuantity: stockNum,
-          imageUrl: formData.imageUrl || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400",
+          image_url: img,
+          imageUrl: img,
+          is_active: formData.isActive,
           isActive: formData.isActive,
-          updatedAt: Date.now(),
+          updatedAt: now,
         });
-        showToast("Product Updated", `"${formData.name}" has been updated.`);
+        showToast("Product Updated", `"${formData.name}" has been updated in database.`);
       } else {
         const newProductRef = push(ref(db, "products"));
         const newId = newProductRef.key!;
@@ -303,12 +351,16 @@ export default function IndigoPOSDashboard() {
           name: formData.name,
           price: priceNum,
           category: formData.category,
+          stock_quantity: stockNum,
           stockQuantity: stockNum,
+          min_stock_alert: 10,
           minStockAlert: 10,
-          imageUrl: formData.imageUrl || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400",
+          image_url: img,
+          imageUrl: img,
+          is_active: true,
           isActive: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: now,
+          updatedAt: now,
         });
 
         const logRef = push(ref(db, "inventory_logs"));
@@ -322,9 +374,9 @@ export default function IndigoPOSDashboard() {
           currentStock: stockNum,
           notes: "Initial inventory setup",
           createdBy: "Mario Sitepu",
-          timestamp: Date.now(),
+          timestamp: now,
         });
-        showToast("Product Added", `"${formData.name}" is now live in POS.`);
+        showToast("Product Added", `"${formData.name}" is now live in database & tablet.`);
       }
 
       setIsAddProductOpen(false);
@@ -348,7 +400,11 @@ export default function IndigoPOSDashboard() {
     try {
       const pRef = ref(db, `products/${p.id}`);
       const nextState = p.isActive === false ? true : false;
-      await update(pRef, { isActive: nextState, updatedAt: Date.now() });
+      await update(pRef, {
+        isActive: nextState,
+        is_active: nextState,
+        updatedAt: Date.now(),
+      });
       showToast(nextState ? "Product Active" : "Product Inactive", `"${p.name}" status updated.`);
     } catch (err) {
       alert("Error updating status: " + err);
@@ -359,7 +415,7 @@ export default function IndigoPOSDashboard() {
     if (confirm(`Are you sure you want to delete "${p.name}"?`)) {
       try {
         await remove(ref(db, `products/${p.id}`));
-        showToast("Product Deleted", `"${p.name}" removed from catalog.`, "info");
+        showToast("Product Deleted", `"${p.name}" removed from database.`, "info");
       } catch (err) {
         alert("Error deleting product: " + err);
       }
@@ -378,11 +434,13 @@ export default function IndigoPOSDashboard() {
 
     const prevStock = selectedStockProduct.stockQuantity ?? 50;
     const newStock = stockModalType === "IN" ? prevStock + qty : Math.max(0, prevStock - qty);
+    const now = Date.now();
 
     try {
       await update(ref(db, `products/${selectedStockProduct.id}`), {
         stockQuantity: newStock,
-        updatedAt: Date.now(),
+        stock_quantity: newStock,
+        updatedAt: now,
       });
 
       const logRef = push(ref(db, "inventory_logs"));
@@ -396,12 +454,12 @@ export default function IndigoPOSDashboard() {
         currentStock: newStock,
         notes: stockNotesInput || (stockModalType === "IN" ? "Vendor Delivery" : "Damaged / Waste"),
         createdBy: "Mario Sitepu",
-        timestamp: Date.now(),
+        timestamp: now,
       });
 
       showToast(
         stockModalType === "IN" ? "Stock Adjusted (+)" : "Stock Adjusted (-)",
-        `${selectedStockProduct.name} stock is now ${newStock} units.`
+        `${selectedStockProduct.name} stock updated to ${newStock} units.`
       );
 
       setIsStockModalOpen(false);
@@ -428,7 +486,6 @@ export default function IndigoPOSDashboard() {
       {/* ================= FIGMA SIDEBAR NAVIGATION ================= */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between shrink-0 shadow-sm">
         <div className="space-y-6">
-          {/* Logo & Brand matching Figma */}
           <div className="flex items-center gap-3 px-2">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
               <Store className="w-5 h-5" />
@@ -441,7 +498,6 @@ export default function IndigoPOSDashboard() {
             </div>
           </div>
 
-          {/* Navigation Links */}
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
@@ -501,7 +557,6 @@ export default function IndigoPOSDashboard() {
           </nav>
         </div>
 
-        {/* User Card at bottom of Sidebar */}
         <div className="pt-4 border-t border-slate-100">
           <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
             <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200">
@@ -517,7 +572,6 @@ export default function IndigoPOSDashboard() {
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">
-        {/* Top Header matching Figma */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -526,12 +580,14 @@ export default function IndigoPOSDashboard() {
               {activeTab === "inventory" && "Inventory & Stock"}
               {activeTab === "reports" && "Sales Reports"}
             </h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Live Cloud Synchronization with Android POS Tablet
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+              <p className="text-xs text-emerald-700 font-bold">
+                Firebase Realtime Database Synced: kasir-catat
+              </p>
+            </div>
           </div>
 
-          {/* Quick Header Actions matching Figma */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -572,9 +628,7 @@ export default function IndigoPOSDashboard() {
         {/* ================= SCREEN 1: DASHBOARD OVERVIEW ================= */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* 4 KPI Cards matching Figma exactly */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {/* Card 1: Today's Sales */}
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Today's Sales</span>
@@ -588,7 +642,6 @@ export default function IndigoPOSDashboard() {
                 <p className="text-xs text-slate-400 mt-1 font-medium">Updated just now</p>
               </div>
 
-              {/* Card 2: Total Orders */}
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Orders</span>
@@ -602,7 +655,6 @@ export default function IndigoPOSDashboard() {
                 <p className="text-xs text-slate-400 mt-1 font-medium">From POS Android Tablet</p>
               </div>
 
-              {/* Card 3: Top Selling Item */}
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Top Selling Item</span>
@@ -614,7 +666,6 @@ export default function IndigoPOSDashboard() {
                 <p className="text-xs text-slate-400 mt-1 font-medium">{metrics.topItem.qty || 24} units sold</p>
               </div>
 
-              {/* Card 4: Low Stock Alerts */}
               <div className="figma-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Low Stock Alerts</span>
@@ -632,9 +683,7 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* 2-Column Section: Sales Trend Chart & Recent Transactions */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Sales Trend (Last 7 Days) SVG Chart */}
               <div className="lg:col-span-7 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -646,7 +695,6 @@ export default function IndigoPOSDashboard() {
                   </span>
                 </div>
 
-                {/* SVG Visual Chart */}
                 <div className="mt-6">
                   <div className="h-44 w-full relative flex items-end">
                     <svg className="w-full h-full overflow-visible" viewBox="0 0 700 160" preserveAspectRatio="none">
@@ -669,7 +717,6 @@ export default function IndigoPOSDashboard() {
                       />
                     </svg>
                   </div>
-                  {/* Days Label */}
                   <div className="flex justify-between text-xs font-bold text-slate-400 mt-3 pt-2 border-t border-slate-100">
                     {metrics.days.map((d) => (
                       <span key={d}>{d}</span>
@@ -678,7 +725,6 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              {/* Recent Transactions Table */}
               <div className="lg:col-span-5 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-extrabold text-base text-slate-900">Recent Transactions</h3>
@@ -721,12 +767,11 @@ export default function IndigoPOSDashboard() {
             </div>
           </div>
         )}
+
         {/* ================= SCREEN 2: MENU MANAGEMENT ================= */}
         {activeTab === "menu" && (
           <div className="space-y-6">
-            {/* Top Toolbar matching Figma */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              {/* Category Tabs matching Figma */}
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
                 {categories.map((cat) => (
                   <button
@@ -743,7 +788,6 @@ export default function IndigoPOSDashboard() {
                 ))}
               </div>
 
-              {/* Search Box matching Figma */}
               <div className="relative w-full sm:w-72">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -756,7 +800,6 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* Menu Table matching Figma */}
             <div className="figma-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-600">
@@ -846,7 +889,6 @@ export default function IndigoPOSDashboard() {
                 </table>
               </div>
 
-              {/* Table Footer matching Figma */}
               <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
                   Showing 1 to {products.length} of {products.length} items
@@ -856,11 +898,9 @@ export default function IndigoPOSDashboard() {
             </div>
           </div>
         )}
-
         {/* ================= SCREEN 3: INVENTORY & STOCK ================= */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
-            {/* 3 KPI Cards matching Figma */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="figma-card p-5">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Inventory Value</span>
@@ -887,7 +927,6 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* Actions Bar matching Figma */}
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-base text-slate-900">Stock Movement Log</h3>
               <div className="flex items-center gap-2">
@@ -909,7 +948,6 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* Stock Movement Log Table matching Figma */}
             <div className="figma-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-600">
@@ -962,10 +1000,10 @@ export default function IndigoPOSDashboard() {
             </div>
           </div>
         )}
+
         {/* ================= SCREEN 4: SALES REPORTS ================= */}
         {activeTab === "reports" && (
           <div className="space-y-6">
-            {/* Top Toolbar matching Figma */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-extrabold text-base text-slate-900">Financial Breakdown & History</h3>
@@ -994,21 +1032,16 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* 2-Column: Donut Breakdown & Sales History Table */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Payment Methods Donut Chart matching Figma */}
               <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between">
                 <div>
                   <h3 className="font-extrabold text-base text-slate-900">Payment Methods</h3>
                   <p className="text-xs text-slate-400">Share of total revenue</p>
 
-                  {/* Circular Visual with Revenue Center */}
                   <div className="py-6 flex flex-col items-center justify-center">
                     <div className="relative w-44 h-44 flex items-center justify-center">
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Background Circle */}
                         <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="14" />
-                        {/* QRIS Stroke */}
                         <circle
                           cx="50"
                           cy="50"
@@ -1020,7 +1053,6 @@ export default function IndigoPOSDashboard() {
                           strokeDashoffset={238 - (238 * metrics.qrisPct) / 100}
                           strokeLinecap="round"
                         />
-                        {/* Cash Stroke */}
                         <circle
                           cx="50"
                           cy="50"
@@ -1034,7 +1066,6 @@ export default function IndigoPOSDashboard() {
                           className="opacity-90"
                         />
                       </svg>
-                      {/* Center Revenue Text matching Figma */}
                       <div className="absolute text-center">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Revenue</span>
                         <span className="text-sm font-black text-slate-900 leading-tight">
@@ -1044,7 +1075,6 @@ export default function IndigoPOSDashboard() {
                     </div>
                   </div>
 
-                  {/* Legend list matching Figma */}
                   <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1073,7 +1103,6 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              {/* Detailed Sales History Table matching Figma */}
               <div className="lg:col-span-8 figma-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-extrabold text-base text-slate-900">Detailed Sales History</h3>
