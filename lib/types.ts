@@ -1,49 +1,48 @@
-export interface Product {
+﻿export interface Product {
   id: string;
   sku?: string;
   name: string;
-  price: number;
   category: string;
-  imageUrl?: string;
+  price: number;
   stockQuantity?: number;
   minStockAlert?: number;
+  imageUrl?: string;
   isActive?: boolean;
   createdAt?: number;
   updatedAt?: number;
 }
 
 export interface TransactionItem {
-  productId: string;
+  id: string;
   name: string;
   price: number;
   qty: number;
   subtotal: number;
-  note?: string;
 }
 
 export interface Transaction {
   id: string;
-  invoiceNumber: string;
+  invoiceNumber?: string;
   items: TransactionItem[];
   subtotal: number;
-  discountAmount: number;
+  discount: number;
   grandTotal: number;
-  paymentMethod: "CASH" | "QRIS";
+  paymentMethod: "CASH" | "QRIS" | "TRANSFER" | string;
   cashReceived?: number;
   changeGiven?: number;
-  status: "SUCCESS" | "REFUNDED";
   createdAt: number;
+  cashierName?: string;
 }
 
 export interface InventoryLog {
   id: string;
   productId: string;
   productName: string;
-  type: "IN" | "OUT" | "SALE" | "ADJUSTMENT";
+  type: "IN" | "OUT" | "SALE";
   quantity: number;
   previousStock: number;
   currentStock: number;
-  notes: string;
-  createdBy: string;
+  notes?: string;
+  createdBy?: string;
   timestamp: number;
 }
