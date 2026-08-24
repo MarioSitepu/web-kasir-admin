@@ -467,7 +467,7 @@ export default function IndigoPOSDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased text-left w-full">
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-200">
@@ -497,7 +497,7 @@ export default function IndigoPOSDashboard() {
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
                 activeTab === "overview"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -509,7 +509,7 @@ export default function IndigoPOSDashboard() {
 
             <button
               onClick={() => setActiveTab("menu")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
                 activeTab === "menu"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -524,7 +524,7 @@ export default function IndigoPOSDashboard() {
 
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
                 activeTab === "inventory"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -541,7 +541,7 @@ export default function IndigoPOSDashboard() {
 
             <button
               onClick={() => setActiveTab("reports")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
                 activeTab === "reports"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -567,7 +567,7 @@ export default function IndigoPOSDashboard() {
       </aside>
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full text-left">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -768,7 +768,7 @@ export default function IndigoPOSDashboard() {
         {activeTab === "menu" && (
           <div className="space-y-6">
             {/* Top Toolbar left-aligned */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-start gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-4 w-full text-left">
               <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto">
                 {categories.map((cat) => (
                   <button
@@ -799,7 +799,7 @@ export default function IndigoPOSDashboard() {
 
             <div className="figma-card overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
+                <table className="w-full text-left text-sm text-slate-600 border-collapse">
                   <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
                       <th className="py-3.5 px-5">Foto & Nama Menu</th>
@@ -807,7 +807,7 @@ export default function IndigoPOSDashboard() {
                       <th className="py-3.5 px-4">Harga Jual</th>
                       <th className="py-3.5 px-4">Status Kasir</th>
                       <th className="py-3.5 px-4">Sisa Stok</th>
-                      <th className="py-3.5 px-5 text-right">Aksi</th>
+                      <th className="py-3.5 px-5 text-left">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-xs">
@@ -854,8 +854,8 @@ export default function IndigoPOSDashboard() {
                             </button>
                           </td>
                           <td className="py-3.5 px-4 font-bold text-slate-800">{product.stockQuantity ?? 50} unit</td>
-                          <td className="py-3.5 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                          <td className="py-3.5 px-5 text-left">
+                            <div className="flex items-center justify-start gap-1.5">
                               <button
                                 onClick={() => {
                                   setEditingProduct(product);
