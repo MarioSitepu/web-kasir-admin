@@ -33,14 +33,18 @@ import {
   Check,
   Copy,
   Layers,
-  Sparkles
+  Sparkles,
+  Database,
+  HardDrive,
+  Calendar,
+  AlertTriangle
 } from "lucide-react";
 
 // Robust parsing supporting Flutter & Web database formats
 const parseProduct = (key: string, val: any): Product => {
   return {
     id: key,
-    sku: val.sku || `SKU-${key.slice(-4)}`,
+    sku: val.sku || "SKU-" + key.slice(-4),
     name: val.name || "Menu Tanpa Nama",
     price: Number(val.price) || 0,
     category: val.category || "Minuman",
@@ -103,7 +107,8 @@ export default function IndigoPOSDashboard() {
   // Filters
   const [menuSearch, setMenuSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
-  const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "all">("7days");
+  const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "month" | "all">("all");
+  const [selectedMonth, setSelectedMonth] = useState<string>("all"); // format YYYY-MM or 'all'
 
   // Modals
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -116,12 +121,18 @@ export default function IndigoPOSDashboard() {
   const [stockNotesInput, setStockNotesInput] = useState("");
   const [selectedTxDetail, setSelectedTxDetail] = useState<Transaction | null>(null);
 
-  // Toast State
-  const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; type?: "success" | "info" } | null>(null);
+  // Modal: Hapus Database Per Bulan
+  const [isDeleteMonthModalOpen, setIsDeleteMonthModalOpen] = useState(false);
+  const [monthToDelete, setMonthToDelete] = useState<string>("");
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const showToast = (title: string, desc: string, type: "success" | "info" = "success") => {
+  // Toast State
+  const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; type?: "success" | "info" | "danger" } | null>(null);
+
+  const showToast = (title: string, desc: string, type: "success" | "info" | "danger" = "success") => {
     setToastMsg({ title, desc, type });
-    setTimeout(() => setToastMsg(null), 3500);
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
   // Product Form
@@ -223,10 +234,71 @@ export default function IndigoPOSDashboard() {
     });
   };
 
+  // Extract unique months from transactions (e.g., '2026-08', '2026-07')
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    transactions.forEach((t) => {
+      if (t.createdAt) {
+        const d = new Date(t.createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        monthSet.add(yyyy + "-" + mm);
+      }
+    });
+    // Add current month if not present
+    const current = new Date();
+    const curKey = current.getFullYear() + "-" + String(current.getMonth() + 1).padStart(2, "0");
+    monthSet.add(curKey);
+
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    return Array.from(monthSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => {
+        const [y, m] = key.split("-");
+        const monthName = monthNames[parseInt(m, 10) - 1] || m;
+        return {
+          key,
+          label: monthName + " " + y,
+        };
+      });
+  }, [transactions]);
+
+  // Filtered transactions based on month & date filters
+  const filteredTransactions = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    return transactions.filter((t) => {
+      // 1. Month Filter
+      if (selectedMonth !== "all") {
+        const d = new Date(t.createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const key = yyyy + "-" + mm;
+        if (key !== selectedMonth) return false;
+      }
+
+      // 2. Relative Date Filter
+      if (reportDateFilter === "today") {
+        return (t.createdAt || 0) >= startOfToday;
+      } else if (reportDateFilter === "7days") {
+        return (t.createdAt || 0) >= startOfToday - 7 * 24 * 60 * 60 * 1000;
+      } else if (reportDateFilter === "30days") {
+        return (t.createdAt || 0) >= startOfToday - 30 * 24 * 60 * 60 * 1000;
+      }
+
+      return true;
+    });
+  }, [transactions, selectedMonth, reportDateFilter]);
+
+  // Storage and Revenue Metrics
   const metrics = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startOfWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
 
     const todayTx = transactions.filter((t) => (t.createdAt || 0) >= startOfToday);
     const todaySales = todayTx.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
@@ -240,7 +312,7 @@ export default function IndigoPOSDashboard() {
     const lowStockItems = products.filter((p) => (p.stockQuantity ?? 50) <= (p.minStockAlert ?? 10));
 
     const itemMap: { [name: string]: { qty: number; revenue: number } } = {};
-    transactions.forEach((t) => {
+    filteredTransactions.forEach((t) => {
       (t.items || []).forEach((item) => {
         if (!itemMap[item.name]) itemMap[item.name] = { qty: 0, revenue: 0 };
         itemMap[item.name].qty += item.qty || 1;
@@ -255,16 +327,27 @@ export default function IndigoPOSDashboard() {
     let cashTotal = 0;
     let qrisTotal = 0;
     let transferTotal = 0;
-    transactions.forEach((t) => {
+    filteredTransactions.forEach((t) => {
       if (t.paymentMethod === "QRIS") qrisTotal += t.grandTotal || 0;
       else if (t.paymentMethod === "TRANSFER") transferTotal += t.grandTotal || 0;
       else cashTotal += t.grandTotal || 0;
     });
 
-    const totalRev = transactions.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
+    const totalRev = filteredTransactions.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
     const qrisPct = totalRev > 0 ? Math.round((qrisTotal / totalRev) * 100) : 60;
     const cashPct = totalRev > 0 ? Math.round((cashTotal / totalRev) * 100) : 30;
     const transferPct = totalRev > 0 ? Math.max(0, 100 - qrisPct - cashPct) : 10;
+
+    // --- REALTIME DATABASE STORAGE SIZE CALCULATION ---
+    const productsBytes = new TextEncoder().encode(JSON.stringify(products)).length;
+    const txBytes = new TextEncoder().encode(JSON.stringify(transactions)).length;
+    const logsBytes = new TextEncoder().encode(JSON.stringify(inventoryLogs)).length;
+    const totalBytes = productsBytes + txBytes + logsBytes + 2048; // include metadata overhead
+
+    const totalKB = (totalBytes / 1024).toFixed(2);
+    const totalMB = (totalBytes / (1024 * 1024)).toFixed(3);
+    const freeTierLimitMB = 1000; // 1 GB = 1000 MB
+    const storageUsagePercent = Math.max(0.01, ((totalBytes / (1024 * 1024 * 1000)) * 100)).toFixed(2);
 
     const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
     return {
@@ -281,21 +364,26 @@ export default function IndigoPOSDashboard() {
       cashPct,
       qrisPct,
       transferPct,
+      totalBytes,
+      totalKB,
+      totalMB,
+      freeTierLimitMB,
+      storageUsagePercent,
       days,
     };
-  }, [transactions, products]);
+  }, [transactions, products, inventoryLogs, filteredTransactions]);
 
   const handleExportCSV = () => {
-    if (transactions.length === 0) {
+    if (filteredTransactions.length === 0) {
       alert("Belum ada data transaksi untuk diunduh");
       return;
     }
     const headers = ["No. Invoice", "Tanggal", "Item Pesanan", "Metode Bayar", "Total Bayar (Rp)"];
-    const rows = transactions.map((t) => [
-      `"${t.invoiceNumber || t.id}"`,
-      `"${new Date(t.createdAt).toISOString()}"`,
-      `"${(t.items || []).map((i) => `${i.name} x${i.qty}`).join(", ")}"`,
-      `"${t.paymentMethod}"`,
+    const rows = filteredTransactions.map((t) => [
+      '"' + (t.invoiceNumber || t.id) + '"',
+      '"' + new Date(t.createdAt).toISOString() + '"',
+      '"' + (t.items || []).map((i) => i.name + " x" + i.qty).join(", ") + '"',
+      '"' + t.paymentMethod + '"',
       t.grandTotal,
     ]);
 
@@ -303,11 +391,58 @@ export default function IndigoPOSDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `laporan_penjualan_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", "laporan_penjualan_" + (selectedMonth !== "all" ? selectedMonth : "semua") + ".csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("Laporan Berhasil Diunduh", "File CSV telah tersimpan di komputer Anda.");
+    showToast("Laporan Berhasil Diunduh", "File CSV periode terpilih telah tersimpan di komputer Anda.");
+  };
+
+  // Function to delete transactions for a specific month
+  const handleDeleteMonthTransactions = async () => {
+    if (!monthToDelete) {
+      alert("Silakan pilih bulan yang ingin dihapus datanya.");
+      return;
+    }
+
+    if (confirmDeleteText.trim().toUpperCase() !== "HAPUS") {
+      alert('Ketik kata "HAPUS" untuk mengonfirmasi penghapusan data secara permanen.');
+      return;
+    }
+
+    const txToDelete = transactions.filter((t) => {
+      const d = new Date(t.createdAt);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      return yyyy + "-" + mm === monthToDelete;
+    });
+
+    if (txToDelete.length === 0) {
+      alert("Tidak ada data transaksi pada bulan yang dipilih.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Remove all selected transactions from Firebase RTDB
+      for (const tx of txToDelete) {
+        await remove(ref(db, "transactions/" + tx.id));
+      }
+
+      showToast(
+        "Database Berhasil Direset",
+        txToDelete.length + " data transaksi bulan " + monthToDelete + " telah dihapus permanen.",
+        "info"
+      );
+
+      setIsDeleteMonthModalOpen(false);
+      setMonthToDelete("");
+      setConfirmDeleteText("");
+    } catch (err) {
+      alert("Gagal menghapus data: " + err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -319,10 +454,10 @@ export default function IndigoPOSDashboard() {
       const now = Date.now();
 
       if (editingProduct) {
-        const productRef = ref(db, `products/${editingProduct.id}`);
+        const productRef = ref(db, "products/" + editingProduct.id);
         await update(productRef, {
           name: formData.name,
-          sku: formData.sku || `SKU-${Date.now().toString().slice(-4)}`,
+          sku: formData.sku || "SKU-" + Date.now().toString().slice(-4),
           price: priceNum,
           category: formData.category,
           stock_quantity: stockNum,
@@ -333,13 +468,13 @@ export default function IndigoPOSDashboard() {
           isActive: formData.isActive,
           updatedAt: now,
         });
-        showToast("Menu Diperbarui", `Perubahan "${formData.name}" langsung aktif di kasir.`);
+        showToast("Menu Diperbarui", 'Perubahan "' + formData.name + '" langsung aktif di kasir.');
       } else {
         const newProductRef = push(ref(db, "products"));
         const newId = newProductRef.key!;
         await set(newProductRef, {
           id: newId,
-          sku: formData.sku || `SKU-${Date.now().toString().slice(-4)}`,
+          sku: formData.sku || "SKU-" + Date.now().toString().slice(-4),
           name: formData.name,
           price: priceNum,
           category: formData.category,
@@ -368,7 +503,7 @@ export default function IndigoPOSDashboard() {
           createdBy: "Mario Sitepu (Pemilik)",
           timestamp: now,
         });
-        showToast("Menu Berhasil Ditambah", `"${formData.name}" sekarang muncul di tablet kasir.`);
+        showToast("Menu Berhasil Ditambah", '"' + formData.name + '" sekarang muncul di tablet kasir.');
       }
 
       setIsAddProductOpen(false);
@@ -390,7 +525,7 @@ export default function IndigoPOSDashboard() {
 
   const handleToggleActive = async (p: Product) => {
     try {
-      const pRef = ref(db, `products/${p.id}`);
+      const pRef = ref(db, "products/" + p.id);
       const nextState = p.isActive === false ? true : false;
       await update(pRef, {
         isActive: nextState,
@@ -399,7 +534,7 @@ export default function IndigoPOSDashboard() {
       });
       showToast(
         nextState ? "Menu Diaktifkan" : "Menu Dinonaktifkan",
-        `"${p.name}" ${nextState ? "dapat dipilih kasir" : "disembunyikan dari kasir"}.`
+        '"' + p.name + '" ' + (nextState ? "dapat dipilih kasir" : "disembunyikan dari kasir") + "."
       );
     } catch (err) {
       alert("Gagal mengubah status: " + err);
@@ -407,10 +542,10 @@ export default function IndigoPOSDashboard() {
   };
 
   const handleDeleteProduct = async (p: Product) => {
-    if (confirm(`Yakin ingin menghapus menu "${p.name}" dari katalog kasir?`)) {
+    if (confirm('Yakin ingin menghapus menu "' + p.name + '" dari katalog kasir?')) {
       try {
-        await remove(ref(db, `products/${p.id}`));
-        showToast("Menu Dihapus", `"${p.name}" telah dihapus dari daftar.`, "info");
+        await remove(ref(db, "products/" + p.id));
+        showToast("Menu Dihapus", '"' + p.name + '" telah dihapus dari daftar.', "info");
       } catch (err) {
         alert("Gagal menghapus menu: " + err);
       }
@@ -432,7 +567,7 @@ export default function IndigoPOSDashboard() {
     const now = Date.now();
 
     try {
-      await update(ref(db, `products/${selectedStockProduct.id}`), {
+      await update(ref(db, "products/" + selectedStockProduct.id), {
         stockQuantity: newStock,
         stock_quantity: newStock,
         updatedAt: now,
@@ -454,7 +589,7 @@ export default function IndigoPOSDashboard() {
 
       showToast(
         stockModalType === "IN" ? "Stok Berhasil Ditambah" : "Stok Disesuaikan",
-        `Stok ${selectedStockProduct.name} saat ini menjadi ${newStock} unit.`
+        "Stok " + selectedStockProduct.name + " saat ini menjadi " + newStock + " unit."
       );
 
       setIsStockModalOpen(false);
@@ -470,53 +605,53 @@ export default function IndigoPOSDashboard() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased text-left w-full">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-          <div>
-            <p className="text-xs font-bold text-white">{toastMsg.title}</p>
-            <p className="text-[11px] text-slate-300">{toastMsg.desc}</p>
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-200 text-left">
+          <CheckCircle2 className={"w-5 h-5 shrink-0 " + (toastMsg.type === "danger" ? "text-rose-400" : "text-emerald-400")} />
+          <div className="text-left">
+            <p className="text-xs font-bold text-white text-left">{toastMsg.title}</p>
+            <p className="text-[11px] text-slate-300 text-left">{toastMsg.desc}</p>
           </div>
         </div>
       )}
 
-      {/* ================= SIDEBAR NAVIGATION ================= */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between shrink-0 shadow-sm">
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+      {/* ================= SIDEBAR NAVIGATION (RATA KIRI) ================= */}
+      <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between shrink-0 shadow-sm text-left">
+        <div className="space-y-6 text-left">
+          <div className="flex items-center justify-start gap-3 px-2 text-left">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
               <Store className="w-5 h-5" />
             </div>
-            <div>
-              <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-none">Indigo POS</h1>
-              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full mt-1 inline-block border border-indigo-100">
+            <div className="text-left">
+              <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-none text-left">Indigo POS</h1>
+              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full mt-1 inline-block border border-indigo-100 text-left">
                 Edisi UMKM & Kafe
               </span>
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 text-left">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
                 activeTab === "overview"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              )}
             >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Ringkasan Penjualan</span>
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span className="text-left">Ringkasan Penjualan</span>
             </button>
 
             <button
               onClick={() => setActiveTab("menu")}
-              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
                 activeTab === "menu"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              )}
             >
-              <UtensilsCrossed className="w-4 h-4" />
-              <span>Manajemen Menu</span>
+              <UtensilsCrossed className="w-4 h-4 shrink-0" />
+              <span className="text-left">Manajemen Menu</span>
               <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
                 {products.length}
               </span>
@@ -524,14 +659,14 @@ export default function IndigoPOSDashboard() {
 
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
                 activeTab === "inventory"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              )}
             >
-              <Boxes className="w-4 h-4" />
-              <span>Stok & Inventori</span>
+              <Boxes className="w-4 h-4 shrink-0" />
+              <span className="text-left">Stok & Inventori</span>
               {metrics.lowStockCount > 0 && (
                 <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold border border-rose-100">
                   {metrics.lowStockCount}
@@ -541,26 +676,26 @@ export default function IndigoPOSDashboard() {
 
             <button
               onClick={() => setActiveTab("reports")}
-              className={`w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
                 activeTab === "reports"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              )}
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>Laporan Keuangan</span>
+              <BarChart3 className="w-4 h-4 shrink-0" />
+              <span className="text-left">Laporan Keuangan</span>
             </button>
           </nav>
         </div>
 
-        <div className="pt-4 border-t border-slate-100">
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200">
+        <div className="pt-4 border-t border-slate-100 text-left">
+          <div className="flex items-center justify-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left">
+            <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200 shrink-0">
               MS
             </div>
             <div className="text-left overflow-hidden">
-              <p className="text-xs font-bold text-slate-900 truncate">Mario Sitepu</p>
-              <p className="text-[11px] text-slate-500 truncate">Pemilik Usaha</p>
+              <p className="text-xs font-bold text-slate-900 truncate text-left">Mario Sitepu</p>
+              <p className="text-[11px] text-slate-500 truncate text-left">Pemilik Usaha</p>
             </div>
           </div>
         </div>
@@ -568,23 +703,23 @@ export default function IndigoPOSDashboard() {
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full text-left">
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 w-full text-left">
+          <div className="text-left">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight text-left">
               {activeTab === "overview" && "Ringkasan Penjualan"}
               {activeTab === "menu" && "Manajemen Menu & Harga"}
               {activeTab === "inventory" && "Stok & Kartu Mutasi"}
-              {activeTab === "reports" && "Laporan Keuangan"}
+              {activeTab === "reports" && "Laporan Keuangan & Database"}
             </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-              <p className="text-xs text-emerald-700 font-bold">
+            <div className="flex items-center justify-start gap-2 mt-1 text-left">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block shrink-0" />
+              <p className="text-xs text-emerald-700 font-bold text-left">
                 Terhubung Otomatis ke Tablet Kasir (Data Terkini)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-start sm:justify-end gap-3 text-left">
             <button
               onClick={() => {
                 if (products.length > 0) {
@@ -604,7 +739,7 @@ export default function IndigoPOSDashboard() {
                 setEditingProduct(null);
                 setFormData({
                   name: "",
-                  sku: `SKU-${Date.now().toString().slice(-4)}`,
+                  sku: "SKU-" + Date.now().toString().slice(-4),
                   price: "",
                   category: "Minuman",
                   stockQuantity: "50",
@@ -623,75 +758,75 @@ export default function IndigoPOSDashboard() {
 
         {/* ================= SCREEN 1: RINGKASAN ================= */}
         {activeTab === "overview" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="figma-card p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Penjualan Hari Ini</span>
+          <div className="space-y-6 w-full text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full text-left">
+              <div className="figma-card p-5 text-left">
+                <div className="flex items-center justify-between text-left">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Penjualan Hari Ini</span>
                   <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                     +12% dibanding kemarin
                   </span>
                 </div>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
                   {formatIDR(metrics.todaySales || 1240000)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Diperbarui realtime</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Diperbarui realtime</p>
               </div>
 
-              <div className="figma-card p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Transaksi</span>
+              <div className="figma-card p-5 text-left">
+                <div className="flex items-center justify-between text-left">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Total Transaksi</span>
                   <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                     +5% dibanding kemarin
                   </span>
                 </div>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
                   {metrics.todayOrders || 48} Struk Kasir
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Dari Tablet Kasir Android</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Dari Tablet Kasir Android</p>
               </div>
 
-              <div className="figma-card p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Menu Paling Laris</span>
-                  <span className="text-xs text-indigo-600 font-bold">★ Terlaris</span>
+              <div className="figma-card p-5 text-left">
+                <div className="flex items-center justify-between text-left">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Menu Paling Laris</span>
+                  <span className="text-xs text-indigo-600 font-bold">? Terlaris</span>
                 </div>
-                <div className="text-lg font-extrabold text-slate-900 tracking-tight mt-3 truncate">
+                <div className="text-lg font-extrabold text-slate-900 tracking-tight mt-3 truncate text-left">
                   {metrics.topItem.name}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">{metrics.topItem.qty || 24} porsi terjual</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">{metrics.topItem.qty || 24} porsi terjual</p>
               </div>
 
-              <div className="figma-card p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stok Menipis</span>
+              <div className="figma-card p-5 text-left">
+                <div className="flex items-center justify-between text-left">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Stok Menipis</span>
                   <button
                     onClick={() => setActiveTab("inventory")}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold text-left"
                   >
                     Lihat &rarr;
                   </button>
                 </div>
-                <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3">
+                <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3 text-left">
                   {metrics.lowStockCount || 3} Menu
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Perlu restock segera</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Perlu restock segera</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-7 figma-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-extrabold text-base text-slate-900">Tren Penjualan (7 Hari Terakhir)</h3>
-                    <p className="text-xs text-slate-400">Grafik performa pendapatan harian</p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
+              <div className="lg:col-span-7 figma-card p-6 text-left">
+                <div className="flex items-center justify-between mb-4 text-left">
+                  <div className="text-left">
+                    <h3 className="font-extrabold text-base text-slate-900 text-left">Tren Penjualan (7 Hari Terakhir)</h3>
+                    <p className="text-xs text-slate-400 text-left">Grafik performa pendapatan harian</p>
                   </div>
                   <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg">
                     Mingguan
                   </span>
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-6 w-full text-left">
                   <div className="h-44 w-full relative flex items-end">
                     <svg className="w-full h-full overflow-visible" viewBox="0 0 700 160" preserveAspectRatio="none">
                       <defs>
@@ -713,17 +848,17 @@ export default function IndigoPOSDashboard() {
                       />
                     </svg>
                   </div>
-                  <div className="flex justify-between text-xs font-bold text-slate-400 mt-3 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between text-xs font-bold text-slate-400 mt-3 pt-2 border-t border-slate-100 w-full text-left">
                     {metrics.days.map((d) => (
-                      <span key={d}>{d}</span>
+                      <span key={d} className="text-left">{d}</span>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="lg:col-span-5 figma-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-extrabold text-base text-slate-900">Transaksi Kasir Terbaru</h3>
+              <div className="lg:col-span-5 figma-card p-6 text-left">
+                <div className="flex items-center justify-between mb-4 text-left">
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Transaksi Kasir Terbaru</h3>
                   <button
                     onClick={() => setActiveTab("reports")}
                     className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
@@ -732,20 +867,20 @@ export default function IndigoPOSDashboard() {
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 text-left">
                   {transactions.slice(0, 5).map((t) => (
                     <div
                       key={t.id}
                       onClick={() => setSelectedTxDetail(t)}
-                      className="py-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer rounded-lg px-2 transition-colors"
+                      className="py-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer rounded-lg px-2 transition-colors text-left"
                     >
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                          <span>{t.paymentMethod}</span>
-                          <span className="text-slate-400">•</span>
-                          <span className="font-mono text-slate-500 text-[11px]">{t.invoiceNumber || t.id}</span>
+                      <div className="text-left">
+                        <div className="flex items-center justify-start gap-1.5 text-xs font-bold text-slate-800 text-left">
+                          <span className="text-left">{t.paymentMethod}</span>
+                          <span className="text-slate-400">�</span>
+                          <span className="font-mono text-slate-500 text-[11px] text-left">{t.invoiceNumber || t.id}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(t.createdAt)}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 text-left">{formatDate(t.createdAt)}</p>
                       </div>
                       <div className="text-right">
                         <div className="font-extrabold text-xs text-slate-900">{formatIDR(t.grandTotal)}</div>
@@ -756,7 +891,7 @@ export default function IndigoPOSDashboard() {
                     </div>
                   ))}
                   {transactions.length === 0 && (
-                    <div className="py-8 text-center text-xs text-slate-400">Belum ada transaksi tercatat</div>
+                    <div className="py-8 text-left text-xs text-slate-400">Belum ada transaksi tercatat</div>
                   )}
                 </div>
               </div>
@@ -764,53 +899,52 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
 
-        {/* ================= SCREEN 2: MANAJEMEN MENU (RATA KIRI LENGKAP) ================= */}
+        {/* ================= SCREEN 2: MANAJEMEN MENU ================= */}
         {activeTab === "menu" && (
-          <div className="space-y-6">
-            {/* Top Toolbar left-aligned */}
+          <div className="space-y-6 w-full text-left">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-4 w-full text-left">
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto">
+              <div className="flex items-center justify-start gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto shrink-0 text-left">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-4 py-2 rounded-lg font-bold text-xs whitespace-nowrap transition-all ${
+                    className={"px-4 py-2 rounded-lg font-bold text-xs whitespace-nowrap transition-all text-left " + (
                       selectedCategory === cat.id
                         ? "bg-white text-slate-900 shadow-sm"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    )}
                   >
                     {cat.label}
                   </button>
                 ))}
               </div>
 
-              <div className="relative w-full sm:w-80">
+              <div className="relative w-full sm:w-80 text-left">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={menuSearch}
                   onChange={(e) => setMenuSearch(e.target.value)}
                   placeholder="Cari nama menu atau kategori..."
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm text-left"
                 />
               </div>
             </div>
 
-            <div className="figma-card overflow-hidden">
-              <div className="overflow-x-auto">
+            <div className="figma-card overflow-hidden w-full text-left">
+              <div className="overflow-x-auto w-full text-left">
                 <table className="w-full text-left text-sm text-slate-600 border-collapse">
-                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
                     <tr>
-                      <th className="py-3.5 px-5">Foto & Nama Menu</th>
-                      <th className="py-3.5 px-4">Kategori</th>
-                      <th className="py-3.5 px-4">Harga Jual</th>
-                      <th className="py-3.5 px-4">Status Kasir</th>
-                      <th className="py-3.5 px-4">Sisa Stok</th>
+                      <th className="py-3.5 px-5 text-left">Foto & Nama Menu</th>
+                      <th className="py-3.5 px-4 text-left">Kategori</th>
+                      <th className="py-3.5 px-4 text-left">Harga Jual</th>
+                      <th className="py-3.5 px-4 text-left">Status Kasir</th>
+                      <th className="py-3.5 px-4 text-left">Sisa Stok</th>
                       <th className="py-3.5 px-5 text-left">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-xs">
+                  <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
                     {products
                       .filter((p) => {
                         const matchesCat =
@@ -825,37 +959,37 @@ export default function IndigoPOSDashboard() {
                         return matchesCat && matchesSearch;
                       })
                       .map((product) => (
-                        <tr key={product.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3.5 px-5">
-                            <div className="flex items-center gap-3">
+                        <tr key={product.id} className="hover:bg-slate-50/60 transition-colors text-left">
+                          <td className="py-3.5 px-5 text-left">
+                            <div className="flex items-center justify-start gap-3 text-left">
                               <img
                                 src={product.imageUrl || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400"}
                                 alt={product.name}
-                                className="w-10 h-10 rounded-xl object-cover border border-slate-200"
+                                className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
                               />
-                              <div>
-                                <p className="font-extrabold text-slate-900 text-xs">{product.name}</p>
-                                <p className="text-[11px] text-slate-400 font-mono">{product.sku || "-"}</p>
+                              <div className="text-left">
+                                <p className="font-extrabold text-slate-900 text-xs text-left">{product.name}</p>
+                                <p className="text-[11px] text-slate-400 font-mono text-left">{product.sku || "-"}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-700">{product.category}</td>
-                          <td className="py-3.5 px-4 font-extrabold text-slate-900">{formatIDR(product.price)}</td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 font-semibold text-slate-700 text-left">{product.category}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-slate-900 text-left">{formatIDR(product.price)}</td>
+                          <td className="py-3.5 px-4 text-left">
                             <button
                               onClick={() => handleToggleActive(product)}
-                              className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border transition-all ${
+                              className={"text-[10px] font-extrabold px-2.5 py-1 rounded-full border transition-all text-left " + (
                                 product.isActive !== false
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : "bg-slate-100 text-slate-500 border-slate-200"
-                              }`}
+                              )}
                             >
                               {product.isActive !== false ? "Aktif" : "Nonaktif"}
                             </button>
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-800">{product.stockQuantity ?? 50} unit</td>
+                          <td className="py-3.5 px-4 font-bold text-slate-800 text-left">{product.stockQuantity ?? 50} unit</td>
                           <td className="py-3.5 px-5 text-left">
-                            <div className="flex items-center justify-start gap-1.5">
+                            <div className="flex items-center justify-start gap-1.5 text-left">
                               <button
                                 onClick={() => {
                                   setEditingProduct(product);
@@ -890,11 +1024,11 @@ export default function IndigoPOSDashboard() {
                 </table>
               </div>
 
-              <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>
+              <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 w-full text-left">
+                <span className="text-left">
                   Menampilkan 1 sampai {products.length} dari {products.length} menu
                 </span>
-                <span className="font-semibold text-slate-400">Halaman 1 dari 1</span>
+                <span className="font-semibold text-slate-400 text-left">Halaman 1 dari 1</span>
               </div>
             </div>
           </div>
@@ -902,35 +1036,35 @@ export default function IndigoPOSDashboard() {
 
         {/* ================= SCREEN 3: STOK & INVENTORI ================= */}
         {activeTab === "inventory" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="figma-card p-5">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Nilai Aset Stok</span>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
+          <div className="space-y-6 w-full text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full text-left">
+              <div className="figma-card p-5 text-left">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Total Nilai Aset Stok</span>
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
                   {formatIDR(metrics.totalInventoryValue)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Estimasi nilai produk di outlet</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Estimasi nilai produk di outlet</p>
               </div>
 
-              <div className="figma-card p-5 border-rose-200 bg-rose-50/20">
-                <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Menu Perlu Di-Restock</span>
-                <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3">
+              <div className="figma-card p-5 border-rose-200 bg-rose-50/20 text-left">
+                <span className="text-xs font-bold text-rose-600 uppercase tracking-wider text-left">Menu Perlu Di-Restock</span>
+                <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3 text-left">
                   {metrics.lowStockCount}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Sisa stok di bawah batas minimal (&le;10)</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Sisa stok di bawah batas minimal (&le;10)</p>
               </div>
 
-              <div className="figma-card p-5">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori Menu Aktif</span>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
+              <div className="figma-card p-5 text-left">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Kategori Menu Aktif</span>
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
                   {categories.length - 1}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">Minuman, Makanan, Snack</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Minuman, Makanan, Snack</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-base text-slate-900">Buku Mutasi Stok (Audit Log)</h3>
+            <div className="flex items-center justify-between w-full text-left">
+              <h3 className="font-extrabold text-base text-slate-900 text-left">Buku Mutasi Stok (Audit Log)</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -950,49 +1084,49 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            <div className="figma-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
+            <div className="figma-card overflow-hidden w-full text-left">
+              <div className="overflow-x-auto w-full text-left">
+                <table className="w-full text-left text-sm text-slate-600 border-collapse">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
                     <tr>
-                      <th className="py-3.5 px-5">Tanggal & Jam</th>
-                      <th className="py-3.5 px-4">SKU</th>
-                      <th className="py-3.5 px-4">Nama Menu</th>
-                      <th className="py-3.5 px-4">Perubahan</th>
-                      <th className="py-3.5 px-4">Petugas</th>
-                      <th className="py-3.5 px-5">Keterangan</th>
+                      <th className="py-3.5 px-5 text-left">Tanggal & Jam</th>
+                      <th className="py-3.5 px-4 text-left">SKU</th>
+                      <th className="py-3.5 px-4 text-left">Nama Menu</th>
+                      <th className="py-3.5 px-4 text-left">Perubahan</th>
+                      <th className="py-3.5 px-4 text-left">Petugas</th>
+                      <th className="py-3.5 px-5 text-left">Keterangan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-xs">
+                  <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
                     {inventoryLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-slate-400">
+                        <td colSpan={6} className="text-left py-10 px-5 text-slate-400">
                           Belum ada catatan mutasi stok
                         </td>
                       </tr>
                     ) : (
                       inventoryLogs.map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3.5 px-5 text-slate-500">{formatDate(log.timestamp)}</td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
+                        <tr key={log.id} className="hover:bg-slate-50/60 transition-colors text-left">
+                          <td className="py-3.5 px-5 text-slate-500 text-left">{formatDate(log.timestamp)}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-700 text-left">
                             {products.find((p) => p.id === log.productId)?.sku || "SKU-8021"}
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900">{log.productName}</td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 text-left">{log.productName}</td>
+                          <td className="py-3.5 px-4 text-left">
                             <span
-                              className={`font-black text-xs px-2 py-0.5 rounded-md ${
+                              className={"font-black text-xs px-2 py-0.5 rounded-md text-left " + (
                                 log.type === "IN"
                                   ? "text-emerald-700 bg-emerald-50"
                                   : log.type === "OUT"
                                   ? "text-rose-700 bg-rose-50"
                                   : "text-slate-700 bg-slate-100"
-                              }`}
+                              )}
                             >
-                              {log.type === "IN" ? `+${log.quantity} (Masuk)` : `-${log.quantity} (Keluar)`}
+                              {log.type === "IN" ? "+" + log.quantity + " (Masuk)" : "-" + log.quantity + " (Keluar)"}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-600">{log.createdBy || "Mario Sitepu"}</td>
-                          <td className="py-3.5 px-5 text-slate-500">{log.notes || "Restock dari Supplier"}</td>
+                          <td className="py-3.5 px-4 text-slate-600 text-left">{log.createdBy || "Mario Sitepu"}</td>
+                          <td className="py-3.5 px-5 text-slate-500 text-left">{log.notes || "Restock dari Supplier"}</td>
                         </tr>
                       ))
                     )}
@@ -1003,25 +1137,105 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
 
-        {/* ================= SCREEN 4: LAPORAN KEUANGAN ================= */}
+        {/* ================= SCREEN 4: LAPORAN KEUANGAN & STORAGE ================= */}
         {activeTab === "reports" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900">Rincian Finansial & Riwayat Kasir</h3>
-                <p className="text-xs text-slate-500">Analisis sebaran metode pembayaran dan audit struk transaksi</p>
+          <div className="space-y-6 w-full text-left">
+            {/* 1. DATABASE STORAGE USAGE CARD */}
+            <div className="figma-card p-6 bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl rounded-2xl border-none">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-indigo-400" />
+                    <h3 className="font-extrabold text-lg text-white">Status Penyimpanan Firebase RTDB</h3>
+                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                      Spark Plan (Gratis)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Memantau ukuran data produk, transaksi kasir, dan riwayat mutasi stok.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-left">
+                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Kapasitas Terpakai</p>
+                    <p className="text-base font-extrabold text-white">
+                      {metrics.totalKB} KB <span className="text-xs text-slate-400 font-medium">({metrics.totalMB} MB)</span>
+                    </p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 text-left">
+                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Batas Kuota Gratis</p>
+                    <p className="text-base font-extrabold text-white">
+                      1.000 MB <span className="text-xs text-slate-400 font-medium">(1 GB)</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setMonthToDelete(availableMonths[0]?.key || "");
+                      setConfirmDeleteText("");
+                      setIsDeleteMonthModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/40 transition-all flex items-center gap-1.5 border border-rose-500/50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus Data Per Bulan</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              {/* Progress bar storage */}
+              <div className="mt-5 pt-4 border-t border-white/10">
+                <div className="flex justify-between items-center text-xs font-semibold mb-2">
+                  <span className="text-slate-300">Penggunaan Storage: {metrics.storageUsagePercent}%</span>
+                  <span className="text-emerald-400 font-bold">Tersisa 99.98% (Sangat Luang)</span>
+                </div>
+                <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden p-0.5">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-400 to-indigo-400 rounded-full transition-all duration-500"
+                    style={{ width: metrics.storageUsagePercent + "%", minWidth: "8px" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. TOOLBAR SORTIR BULANAN & RANGE TANGGAL */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full text-left">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 text-left">Rincian Finansial & Riwayat Kasir</h3>
+                <p className="text-xs text-slate-500 text-left">
+                  {selectedMonth !== "all" ? "Menampilkan data bulan " + selectedMonth : "Menampilkan seluruh riwayat transaksi"}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Monthly Selector Dropdown */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-500">Bulan:</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">Semua Bulan (All Time)</option>
+                    {availableMonths.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Relative Filter */}
                 <select
                   value={reportDateFilter}
                   onChange={(e) => setReportDateFilter(e.target.value as any)}
                   className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none focus:border-indigo-500"
                 >
+                  <option value="all">Semua Tanggal</option>
                   <option value="today">Hari Ini</option>
                   <option value="7days">7 Hari Terakhir</option>
                   <option value="30days">30 Hari Terakhir</option>
-                  <option value="all">Semua Waktu</option>
                 </select>
 
                 <button
@@ -1029,16 +1243,17 @@ export default function IndigoPOSDashboard() {
                   className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-sm transition-all flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Unduh Laporan CSV</span>
+                  <span>Unduh CSV</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900">Metode Pembayaran</h3>
-                  <p className="text-xs text-slate-400">Porsi dari total pendapatan</p>
+            {/* 3. CHARTS & TRANSACTION HISTORY */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
+              <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between text-left">
+                <div className="text-left">
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Metode Pembayaran</h3>
+                  <p className="text-xs text-slate-400 text-left">Porsi dari omzet periode terpilih</p>
 
                   <div className="py-6 flex flex-col items-center justify-center">
                     <div className="relative w-44 h-44 flex items-center justify-center">
@@ -1077,27 +1292,27 @@ export default function IndigoPOSDashboard() {
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-indigo-600" />
-                        <span className="font-bold text-slate-700">QRIS Dinamis</span>
+                  <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs text-left">
+                    <div className="flex items-center justify-between text-left">
+                      <div className="flex items-center justify-start gap-2 text-left">
+                        <span className="w-3 h-3 rounded-full bg-indigo-600 shrink-0" />
+                        <span className="font-bold text-slate-700 text-left">QRIS Dinamis</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.qrisPct}%</span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                        <span className="font-bold text-slate-700">Tunai (Cash)</span>
+                    <div className="flex items-center justify-between text-left">
+                      <div className="flex items-center justify-start gap-2 text-left">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="font-bold text-slate-700 text-left">Tunai (Cash)</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.cashPct}%</span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-slate-300" />
-                        <span className="font-bold text-slate-700">Transfer Bank</span>
+                    <div className="flex items-center justify-between text-left">
+                      <div className="flex items-center justify-start gap-2 text-left">
+                        <span className="w-3 h-3 rounded-full bg-slate-300 shrink-0" />
+                        <span className="font-bold text-slate-700 text-left">Transfer Bank</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{metrics.transferPct}%</span>
                     </div>
@@ -1105,53 +1320,61 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              <div className="lg:col-span-8 figma-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-extrabold text-base text-slate-900">Riwayat Transaksi Terperinci</h3>
-                  <span className="text-xs text-slate-400">{transactions.length} Total Transaksi</span>
+              <div className="lg:col-span-8 figma-card p-6 text-left">
+                <div className="flex items-center justify-between mb-4 text-left">
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Riwayat Transaksi Terperinci</h3>
+                  <span className="text-xs text-slate-400 text-left">{filteredTransactions.length} Total Transaksi</span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
+                <div className="overflow-x-auto w-full text-left">
+                  <table className="w-full text-left text-sm text-slate-600 border-collapse">
+                    <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
                       <tr>
-                        <th className="py-3 px-4">Tanggal & Jam</th>
-                        <th className="py-3 px-4">No. Invoice</th>
-                        <th className="py-3 px-4">Item Pesanan</th>
-                        <th className="py-3 px-4">Pembayaran</th>
-                        <th className="py-3 px-4 text-right">Total Bayar</th>
+                        <th className="py-3 px-4 text-left">Tanggal & Jam</th>
+                        <th className="py-3 px-4 text-left">No. Invoice</th>
+                        <th className="py-3 px-4 text-left">Item Pesanan</th>
+                        <th className="py-3 px-4 text-left">Pembayaran</th>
+                        <th className="py-3 px-4 text-left">Total Bayar</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-xs">
-                      {transactions.map((tx) => (
-                        <tr
-                          key={tx.id}
-                          onClick={() => setSelectedTxDetail(tx)}
-                          className="hover:bg-slate-50/60 cursor-pointer transition-colors"
-                        >
-                          <td className="py-3 px-4 text-slate-500">{formatDate(tx.createdAt)}</td>
-                          <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                            {tx.invoiceNumber || tx.id}
-                          </td>
-                          <td className="py-3 px-4 text-slate-700">
-                            {(tx.items || []).length} jenis menu
-                          </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                                tx.paymentMethod === "QRIS"
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              }`}
-                            >
-                              {tx.paymentMethod}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right font-extrabold text-slate-900">
-                            {formatIDR(tx.grandTotal)}
+                    <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
+                      {filteredTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-left py-10 px-4 text-slate-400">
+                            Tidak ada data transaksi pada periode yang dipilih.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredTransactions.map((tx) => (
+                          <tr
+                            key={tx.id}
+                            onClick={() => setSelectedTxDetail(tx)}
+                            className="hover:bg-slate-50/60 cursor-pointer transition-colors text-left"
+                          >
+                            <td className="py-3 px-4 text-slate-500 text-left">{formatDate(tx.createdAt)}</td>
+                            <td className="py-3 px-4 font-mono font-bold text-slate-800 text-left">
+                              {tx.invoiceNumber || tx.id}
+                            </td>
+                            <td className="py-3 px-4 text-slate-700 text-left">
+                              {(tx.items || []).length} jenis menu
+                            </td>
+                            <td className="py-3 px-4 text-left">
+                              <span
+                                className={"text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border text-left " + (
+                                  tx.paymentMethod === "QRIS"
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                )}
+                              >
+                                {tx.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-left font-extrabold text-slate-900">
+                              {formatIDR(tx.grandTotal)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1161,16 +1384,102 @@ export default function IndigoPOSDashboard() {
         )}
       </main>
 
+      {/* ================= MODAL: HAPUS DATABASE PER BULAN ================= */}
+      {isDeleteMonthModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="flex items-center gap-2 text-left">
+                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Hapus Transaksi Per Bulan</h3>
+                  <p className="text-xs text-slate-400 text-left">Membersihkan storage database lama</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDeleteMonthModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
+              >
+                ?
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-left">
+              <p className="text-slate-600 leading-relaxed">
+                Pilih bulan yang ingin dihapus datanya dari Firebase Realtime Database. Tindakan ini akan <strong>menghapus struk transaksi secara permanen</strong> untuk mengosongkan ruang storage.
+              </p>
+
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1">Pilih Bulan Yang Akan Dihapus:</label>
+                <select
+                  value={monthToDelete}
+                  onChange={(e) => setMonthToDelete(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
+                >
+                  {availableMonths.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label} ({transactions.filter(t => {
+                        const d = new Date(t.createdAt);
+                        const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+                        return k === m.key;
+                      }).length} Transaksi)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] space-y-1">
+                <p className="font-bold">?? Peringatan Keamanan Data:</p>
+                <p>Pastikan Anda telah mengunduh laporan CSV sebelum menghapus data transaksi bulan ini.</p>
+              </div>
+
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1">
+                  Ketik kata <span className="text-rose-600 font-black">HAPUS</span> untuk konfirmasi:
+                </label>
+                <input
+                  type="text"
+                  value={confirmDeleteText}
+                  onChange={(e) => setConfirmDeleteText(e.target.value)}
+                  placeholder="Ketik HAPUS"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-bold focus:outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
+              <button
+                type="button"
+                onClick={() => setIsDeleteMonthModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting || confirmDeleteText.trim().toUpperCase() !== "HAPUS"}
+                onClick={handleDeleteMonthTransactions}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-white shadow-sm shadow-rose-200 text-xs flex items-center gap-1.5"
+              >
+                {isDeleting ? "Menghapus..." : "Hapus Permanen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: TAMBAH / EDIT MENU ================= */}
       {(isAddProductOpen || isEditProductOpen) && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-extrabold text-lg text-slate-900">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-5 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="text-left">
+                <h3 className="font-extrabold text-lg text-slate-900 text-left">
                   {editingProduct ? "Edit Menu & Harga Jual" : "Tambah Menu Baru"}
                 </h3>
-                <p className="text-xs text-slate-400">Data akan tersinkronisasi otomatis ke Tablet Kasir</p>
+                <p className="text-xs text-slate-400 text-left">Data akan tersinkronisasi otomatis ke Tablet Kasir</p>
               </div>
               <button
                 onClick={() => {
@@ -1179,42 +1488,42 @@ export default function IndigoPOSDashboard() {
                 }}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm"
               >
-                ✕
+                ?
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-medium">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Menu *</label>
+            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-medium text-left">
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">Nama Menu *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Contoh: Kopi Susu Gula Aren"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Harga Jual (Rp) *</label>
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div className="text-left">
+                  <label className="block font-bold text-slate-700 mb-1 text-left">Harga Jual (Rp) *</label>
                   <input
                     type="number"
                     required
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="18000"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-sm focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-sm focus:outline-none focus:border-indigo-500 text-left"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Kategori Menu *</label>
+                <div className="text-left">
+                  <label className="block font-bold text-slate-700 mb-1 text-left">Kategori Menu *</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium text-left"
                   >
                     <option value="Minuman">Minuman</option>
                     <option value="Makanan">Makanan</option>
@@ -1223,42 +1532,42 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">SKU / Kode Barang</label>
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div className="text-left">
+                  <label className="block font-bold text-slate-700 mb-1 text-left">SKU / Kode Barang</label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     placeholder="KOP-01"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500 text-left"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Stok Awal (Unit)</label>
+                <div className="text-left">
+                  <label className="block font-bold text-slate-700 mb-1 text-left">Stok Awal (Unit)</label>
                   <input
                     type="number"
                     value={formData.stockQuantity}
                     onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
                     placeholder="50"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-left"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">URL Foto Menu</label>
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">URL Foto Menu</label>
                 <input
                   type="url"
                   value={formData.imageUrl}
                   onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
                 <button
                   type="button"
                   onClick={() => {
@@ -1283,60 +1592,60 @@ export default function IndigoPOSDashboard() {
 
       {/* ================= MODAL: ATUR STOK ================= */}
       {isStockModalOpen && selectedStockProduct && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900">Atur Mutasi Stok</h3>
-                <p className="text-xs text-slate-400">Mutasi akan otomatis dicatat pada Audit Log</p>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="text-left">
+                <h3 className="font-extrabold text-base text-slate-900 text-left">Atur Mutasi Stok</h3>
+                <p className="text-xs text-slate-400 text-left">Mutasi akan otomatis dicatat pada Audit Log</p>
               </div>
               <button
                 onClick={() => setIsStockModalOpen(false)}
                 className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
               >
-                ✕
+                ?
               </button>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
-              <div>
-                <p className="font-bold text-slate-900">{selectedStockProduct.name}</p>
-                <p className="text-slate-400">Sisa saat ini: {selectedStockProduct.stockQuantity ?? 50} unit</p>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs text-left">
+              <div className="text-left">
+                <p className="font-bold text-slate-900 text-left">{selectedStockProduct.name}</p>
+                <p className="text-slate-400 text-left">Sisa saat ini: {selectedStockProduct.stockQuantity ?? 50} unit</p>
               </div>
               <span className="font-mono font-bold text-indigo-600">{selectedStockProduct.sku || "-"}</span>
             </div>
 
-            <form onSubmit={handleStockSubmit} className="space-y-4 text-xs font-medium">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Jenis Mutasi</label>
-                <div className="grid grid-cols-2 gap-2">
+            <form onSubmit={handleStockSubmit} className="space-y-4 text-xs font-medium text-left">
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">Jenis Mutasi</label>
+                <div className="grid grid-cols-2 gap-2 text-left">
                   <button
                     type="button"
                     onClick={() => setStockModalType("IN")}
-                    className={`py-2 rounded-xl font-bold border transition-all ${
+                    className={"py-2 rounded-xl font-bold border transition-all text-left " + (
                       stockModalType === "IN"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-300"
                         : "bg-white text-slate-600 border-slate-200"
-                    }`}
+                    )}
                   >
                     + Stok Masuk (Restock)
                   </button>
                   <button
                     type="button"
                     onClick={() => setStockModalType("OUT")}
-                    className={`py-2 rounded-xl font-bold border transition-all ${
+                    className={"py-2 rounded-xl font-bold border transition-all text-left " + (
                       stockModalType === "OUT"
                         ? "bg-rose-50 text-rose-700 border-rose-300"
                         : "bg-white text-slate-600 border-slate-200"
-                    }`}
+                    )}
                   >
                     - Stok Keluar (Rusak/Basi)
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Jumlah Unit *</label>
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">Jumlah Unit *</label>
                 <input
                   type="number"
                   required
@@ -1344,22 +1653,22 @@ export default function IndigoPOSDashboard() {
                   value={stockQtyInput}
                   onChange={(e) => setStockQtyInput(e.target.value)}
                   placeholder="Contoh: 20"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-base focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-base focus:outline-none focus:border-indigo-500 text-left"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Keterangan / No. Surat Jalan</label>
+              <div className="text-left">
+                <label className="block font-bold text-slate-700 mb-1 text-left">Keterangan / No. Surat Jalan</label>
                 <input
                   type="text"
                   value={stockNotesInput}
                   onChange={(e) => setStockNotesInput(e.target.value)}
                   placeholder="Contoh: Kiriman Supplier CV Mandiri"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(false)}
@@ -1381,49 +1690,49 @@ export default function IndigoPOSDashboard() {
 
       {/* ================= MODAL: STRUK TRANSAKSI ================= */}
       {selectedTxDetail && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900">Rincian Struk Transaksi</h3>
-                <p className="text-xs text-slate-400 font-mono">{selectedTxDetail.invoiceNumber || selectedTxDetail.id}</p>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="text-left">
+                <h3 className="font-extrabold text-base text-slate-900 text-left">Rincian Struk Transaksi</h3>
+                <p className="text-xs text-slate-400 font-mono text-left">{selectedTxDetail.invoiceNumber || selectedTxDetail.id}</p>
               </div>
               <button
                 onClick={() => setSelectedTxDetail(null)}
                 className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
               >
-                ✕
+                ?
               </button>
             </div>
 
-            <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100 max-h-56 overflow-y-auto text-xs">
+            <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100 max-h-56 overflow-y-auto text-xs text-left">
               {(selectedTxDetail.items || []).map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-slate-800">{item.name}</p>
-                    <p className="text-[11px] text-slate-400">
+                <div key={idx} className="flex items-center justify-between text-left">
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800 text-left">{item.name}</p>
+                    <p className="text-[11px] text-slate-400 text-left">
                       {item.qty} x {formatIDR(item.price)}
                     </p>
                   </div>
-                  <span className="font-extrabold text-slate-900">
+                  <span className="font-extrabold text-slate-900 text-right">
                     {formatIDR(item.subtotal || item.price * item.qty)}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3">
-              <div className="flex justify-between text-slate-500">
-                <span>Waktu Pembelian:</span>
+            <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3 text-left">
+              <div className="flex justify-between text-slate-500 text-left">
+                <span className="text-left">Waktu Pembelian:</span>
                 <span className="font-semibold text-slate-700">{formatDate(selectedTxDetail.createdAt)}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Metode Bayar:</span>
+              <div className="flex justify-between text-slate-500 text-left">
+                <span className="text-left">Metode Bayar:</span>
                 <span className="font-bold text-indigo-600">{selectedTxDetail.paymentMethod}</span>
               </div>
-              <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-100">
-                <span>Total Bayar:</span>
-                <span>{formatIDR(selectedTxDetail.grandTotal)}</span>
+              <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-100 text-left">
+                <span className="text-left">Total Bayar:</span>
+                <span className="text-right">{formatIDR(selectedTxDetail.grandTotal)}</span>
               </div>
             </div>
 
