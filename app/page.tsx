@@ -751,7 +751,7 @@ export default function IndigoPOSDashboard() {
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-200 transition-all flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Menu Baru</span>
+              <span>Menu Baru</span>
             </button>
           </div>
         </header>
@@ -1079,7 +1079,7 @@ export default function IndigoPOSDashboard() {
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Atur / Mutasi Stok</span>
+                  <span>Atur / Mutasi Stok</span>
                 </button>
               </div>
             </div>
@@ -1618,28 +1618,30 @@ export default function IndigoPOSDashboard() {
             <form onSubmit={handleStockSubmit} className="space-y-4 text-xs font-medium text-left">
               <div className="text-left">
                 <label className="block font-bold text-slate-700 mb-1 text-left">Jenis Mutasi</label>
-                <div className="grid grid-cols-2 gap-2 text-left">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setStockModalType("IN")}
-                    className={"py-2 rounded-xl font-bold border transition-all text-left " + (
+                    className={"py-3 px-3.5 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
                       stockModalType === "IN"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                        : "bg-white text-slate-600 border-slate-200"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-400/20"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     )}
                   >
-                    + Stok Masuk (Restock)
+                    <span className="font-extrabold text-emerald-600 text-sm leading-none">+</span>
+                    <span>Stok Masuk (Restock)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setStockModalType("OUT")}
-                    className={"py-2 rounded-xl font-bold border transition-all text-left " + (
+                    className={"py-3 px-3.5 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
                       stockModalType === "OUT"
-                        ? "bg-rose-50 text-rose-700 border-rose-300"
-                        : "bg-white text-slate-600 border-slate-200"
+                        ? "bg-rose-50 text-rose-700 border-rose-400 ring-2 ring-rose-400/20"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     )}
                   >
-                    - Stok Keluar (Rusak/Basi)
+                    <span className="font-extrabold text-rose-600 text-base leading-none">-</span>
+                    <span>Stok Keluar (Rusak/Basi)</span>
                   </button>
                 </div>
               </div>
