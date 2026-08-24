@@ -712,9 +712,9 @@ export default function IndigoPOSDashboard() {
               <Store className="w-5 h-5" />
             </div>
             <div className="text-left">
-              <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-none text-left">Indigo POS</h1>
-              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full mt-1 inline-block border border-indigo-100 text-left">
-                Edisi UMKM & Kafe
+              <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-none text-left">Monitoring Kasir</h1>
+              <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full mt-1 inline-block border border-indigo-100 text-left">
+                Sapo Sapo
               </span>
             </div>
           </div>

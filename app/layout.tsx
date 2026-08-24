@@ -9,8 +9,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Indigo POS (UMKM Edition) | Executive Back-Office",
-  description: "Modern POS Back-Office Dashboard for Coffee Shops & Food Businesses",
+  title: "Monitoring Kasir Sapo Sapo",
+  description: "Sistem Dashboard & Monitoring Kasir Sapo Sapo",
 };
 
 export default function RootLayout({
