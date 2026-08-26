@@ -6,6 +6,7 @@ import { ref, onValue, set, update, remove, push } from "firebase/database";
 import { Product, Transaction, InventoryLog } from "@/lib/types";
 import {
   LayoutDashboard,
+  Menu,
   UtensilsCrossed,
   Boxes,
   BarChart3,
@@ -111,6 +112,7 @@ const parseTransaction = (key: string, val: any): Transaction => {
 };
 
 export default function IndigoPOSDashboard() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "menu" | "inventory" | "reports">("overview");
 
   // Realtime Firebase States
@@ -695,7 +697,7 @@ export default function IndigoPOSDashboard() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased text-left w-full">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-200 text-left">
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-200 text-left max-w-sm">
           <CheckCircle2 className={"w-5 h-5 shrink-0 " + (toastMsg.type === "danger" ? "text-rose-400" : "text-emerald-400")} />
           <div className="text-left">
             <p className="text-xs font-bold text-white text-left">{toastMsg.title}</p>
@@ -704,8 +706,134 @@ export default function IndigoPOSDashboard() {
         </div>
       )}
 
-      {/* ================= SIDEBAR NAVIGATION (RATA KIRI) ================= */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between shrink-0 shadow-sm text-left">
+      {/* ================= MOBILE STICKY TOP HEADER ================= */}
+      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs shrink-0">
+            <Store className="w-4 h-4" />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-sm text-slate-900 leading-tight">Monitoring Kasir</h1>
+            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.2 rounded-full border border-indigo-100">
+              Sapo Sapo
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+          aria-label="Menu Navigasi"
+        >
+          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </header>
+
+      {/* ================= MOBILE DRAWER MENU ================= */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="relative bg-white w-4/5 max-w-xs h-full shadow-2xl p-5 flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                    <Store className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-sm text-slate-900 leading-tight">Monitoring Kasir</h2>
+                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.2 rounded-full border border-indigo-100">
+                      Sapo Sapo
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
+                >
+                  ?
+                </button>
+              </div>
+
+              <nav className="space-y-1.5 text-left">
+                <button
+                  onClick={() => { setActiveTab("overview"); setIsMobileMenuOpen(false); }}
+                  className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
+                    activeTab === "overview"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                      : "text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <LayoutDashboard className="w-4 h-4 shrink-0" />
+                  <span>Ringkasan Penjualan</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("menu"); setIsMobileMenuOpen(false); }}
+                  className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
+                    activeTab === "menu"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                      : "text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <UtensilsCrossed className="w-4 h-4 shrink-0" />
+                  <span>Manajemen Menu</span>
+                  <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
+                    {products.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("inventory"); setIsMobileMenuOpen(false); }}
+                  className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
+                    activeTab === "inventory"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                      : "text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <Boxes className="w-4 h-4 shrink-0" />
+                  <span>Stok & Inventori</span>
+                  {metrics.lowStockCount > 0 && (
+                    <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold">
+                      {metrics.lowStockCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("reports"); setIsMobileMenuOpen(false); }}
+                  className={"w-full flex items-center justify-start text-left gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all " + (
+                    activeTab === "reports"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                      : "text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>Laporan Keuangan</span>
+                </button>
+              </nav>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 text-left">
+              <div className="flex items-center justify-start gap-3 p-2 rounded-xl bg-slate-50 text-left">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200 shrink-0">
+                  MS
+                </div>
+                <div className="text-left overflow-hidden">
+                  <p className="text-xs font-bold text-slate-900 truncate">Mario Sitepu</p>
+                  <p className="text-[10px] text-slate-500 truncate">Pemilik Usaha</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= DESKTOP SIDEBAR NAVIGATION ================= */}
+      <aside className="hidden md:flex md:w-64 bg-white border-r border-slate-200 p-5 flex-col justify-between shrink-0 shadow-sm text-left sticky top-0 h-screen overflow-y-auto">
         <div className="space-y-6 text-left">
           <div className="flex items-center justify-start gap-3 px-2 text-left">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
@@ -792,7 +920,7 @@ export default function IndigoPOSDashboard() {
       </aside>
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full text-left">
+      <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto w-full text-left">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 w-full text-left">
           <div className="text-left">
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight text-left">
@@ -849,7 +977,7 @@ export default function IndigoPOSDashboard() {
         {/* ================= SCREEN 1: RINGKASAN ================= */}
         {activeTab === "overview" && (
           <div className="space-y-6 w-full text-left">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 w-full text-left">
               <div className="figma-card p-5 text-left">
                 <div className="flex items-center justify-between text-left">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Penjualan Hari Ini</span>
