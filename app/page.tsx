@@ -1210,6 +1210,20 @@ export default function IndigoPOSDashboard() {
                             <div className="flex items-center justify-start gap-1.5 text-left">
                               <button
                                 onClick={() => {
+                                  setSelectedStockProduct(product);
+                                  setStockModalType("IN");
+                                  setStockQtyInput("");
+                                  setStockNotesInput("Restock dari Supplier");
+                                  setIsStockModalOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors flex items-center gap-1 font-bold text-[11px]"
+                                title="Tambah / Atur Stok Produk Ini"
+                              >
+                                <Boxes className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">+Stok</span>
+                              </button>
+                              <button
+                                onClick={() => {
                                   setEditingProduct(product);
                                   setFormData({
                                     name: product.name,
@@ -1954,14 +1968,14 @@ export default function IndigoPOSDashboard() {
         </div>
       )}
 
-      {/* ================= MODAL: ATUR STOK ================= */}
-      {isStockModalOpen && selectedStockProduct && (
+      {/* ================= MODAL: ATUR STOK DENGAN PILIHAN BARANG ================= */}
+      {isStockModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-4 text-left animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
               <div className="text-left">
-                <h3 className="font-extrabold text-base text-slate-900 text-left">Atur Mutasi Stok</h3>
-                <p className="text-xs text-slate-400 text-left">Mutasi akan otomatis dicatat pada Audit Log</p>
+                <h3 className="font-extrabold text-base text-slate-900 text-left">Atur / Tambah Stok Produk</h3>
+                <p className="text-xs text-slate-400 text-left">Pilih produk dan masukkan jumlah unit mutasi stok</p>
               </div>
               <button
                 onClick={() => setIsStockModalOpen(false)}
@@ -1971,22 +1985,61 @@ export default function IndigoPOSDashboard() {
               </button>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs text-left">
-              <div className="text-left">
-                <p className="font-bold text-slate-900 text-left">{selectedStockProduct.name}</p>
-                <p className="text-slate-400 text-left">Sisa saat ini: {selectedStockProduct.stockQuantity ?? 50} unit</p>
-              </div>
-              <span className="font-mono font-bold text-indigo-600">{selectedStockProduct.sku || "-"}</span>
-            </div>
-
             <form onSubmit={handleStockSubmit} className="space-y-4 text-xs font-medium text-left">
+              {/* 1. DROPDOWN PILIH BARANG */}
+              <div className="text-left space-y-1">
+                <label className="block font-bold text-slate-700 text-xs">Pilih Produk / Barang Yang Mau Ditambah *</label>
+                <select
+                  value={selectedStockProduct?.id || (products[0]?.id ?? "")}
+                  onChange={(e) => {
+                    const found = products.find((p) => p.id === e.target.value);
+                    if (found) setSelectedStockProduct(found);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500 text-left cursor-pointer"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.category}] {p.name} � (Stok Saat Ini: {p.stockQuantity ?? 50} unit)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. KARTU DETAIL PRODUK TERPILIH */}
+              {selectedStockProduct && (
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden shrink-0">
+                      {selectedStockProduct.imageUrl ? (
+                        <img src={selectedStockProduct.imageUrl} alt={selectedStockProduct.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-slate-900 text-xs">{selectedStockProduct.name}</p>
+                      <p className="text-slate-500 text-[11px]">Kategori: <span className="font-semibold text-slate-700">{selectedStockProduct.category}</span></p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-slate-200/80 rounded text-slate-700 font-bold">
+                      {selectedStockProduct.sku || "SKU-AUTO"}
+                    </span>
+                    <p className="text-[11px] font-bold text-indigo-600 mt-0.5">
+                      Stok: {selectedStockProduct.stockQuantity ?? 50} unit
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. JENIS MUTASI */}
               <div className="text-left">
                 <label className="block font-bold text-slate-700 mb-1 text-left">Jenis Mutasi</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setStockModalType("IN")}
-                    className={"py-3 px-3.5 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
+                    className={"py-2.5 px-3 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
                       stockModalType === "IN"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-400/20"
                         : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
@@ -1998,38 +2051,60 @@ export default function IndigoPOSDashboard() {
                   <button
                     type="button"
                     onClick={() => setStockModalType("OUT")}
-                    className={"py-3 px-3.5 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
+                    className={"py-2.5 px-3 rounded-xl font-bold text-xs border transition-all flex items-center justify-center text-center gap-1.5 shadow-sm " + (
                       stockModalType === "OUT"
                         ? "bg-rose-50 text-rose-700 border-rose-400 ring-2 ring-rose-400/20"
                         : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     )}
                   >
-                    <span className="font-extrabold text-rose-600 text-base leading-none">-</span>
+                    <span className="font-extrabold text-rose-600 text-sm leading-none">-</span>
                     <span>Stok Keluar (Rusak/Basi)</span>
                   </button>
                 </div>
               </div>
 
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1 text-left">Jumlah Unit *</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={stockQtyInput}
-                  onChange={(e) => setStockQtyInput(e.target.value)}
-                  placeholder="Contoh: 20"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-base focus:outline-none focus:border-indigo-500 text-left"
-                />
+              {/* 4. JUMLAH UNIT & SIMULASI HASIL */}
+              <div className="text-left space-y-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 text-left">Jumlah Unit {stockModalType === "IN" ? "Ditambah" : "Dikurang"} *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={stockQtyInput}
+                    onChange={(e) => setStockQtyInput(e.target.value)}
+                    placeholder="Contoh: 20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-base focus:outline-none focus:border-indigo-500 text-left"
+                  />
+                </div>
+
+                {selectedStockProduct && (
+                  <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
+                    <div className="text-left">
+                      <p className="text-slate-500 text-[11px]">Sisa Saat Ini:</p>
+                      <p className="font-bold text-slate-800">{selectedStockProduct.stockQuantity ?? 50} unit</p>
+                    </div>
+                    <div className="text-center font-bold text-slate-400">?</div>
+                    <div className="text-right">
+                      <p className="text-slate-500 text-[11px]">Estimasi Stok Akhir:</p>
+                      <p className={"font-extrabold text-sm " + (stockModalType === "IN" ? "text-emerald-700" : "text-rose-700")}>
+                        {stockModalType === "IN"
+                          ? (selectedStockProduct.stockQuantity ?? 50) + (parseInt(stockQtyInput) || 0)
+                          : Math.max(0, (selectedStockProduct.stockQuantity ?? 50) - (parseInt(stockQtyInput) || 0))} unit
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* 5. KETERANGAN / NO SURAT JALAN */}
               <div className="text-left">
                 <label className="block font-bold text-slate-700 mb-1 text-left">Keterangan / No. Surat Jalan</label>
                 <input
                   type="text"
                   value={stockNotesInput}
                   onChange={(e) => setStockNotesInput(e.target.value)}
-                  placeholder="Contoh: Kiriman Supplier CV Mandiri"
+                  placeholder={stockModalType === "IN" ? "Contoh: Kiriman Supplier CV Mandiri" : "Contoh: Kadaluarsa / Rusak Kemasan"}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
                 />
               </div>
@@ -2038,15 +2113,16 @@ export default function IndigoPOSDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-sm shadow-indigo-200"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-sm shadow-indigo-200 text-xs flex items-center gap-1.5"
                 >
-                  Konfirmasi Mutasi
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Simpan Mutasi Stok</span>
                 </button>
               </div>
             </form>
