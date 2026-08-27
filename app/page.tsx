@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { ref, onValue, set, update, remove, push } from "firebase/database";
 import { Product, Transaction, InventoryLog } from "@/lib/types";
+import { getStoredSession, logoutAdmin, AuthUser } from "@/lib/auth";
+import LoginScreen from "@/components/LoginScreen";
 import {
   LayoutDashboard,
   Menu,
@@ -42,7 +44,8 @@ import {
   Upload,
   RefreshCw,
   ImageIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  LogOut
 } from "lucide-react";
 
 
@@ -126,6 +129,20 @@ export default function IndigoPOSDashboard() {
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "month" | "all">("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all"); // format YYYY-MM or 'all'
+
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  // Check persisted session on load
+  useEffect(() => {
+    const session = getStoredSession();
+    if (session) {
+      setCurrentUser(session);
+    }
+    setIsAuthChecking(false);
+  }, []);
 
   // Modals
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -693,6 +710,28 @@ export default function IndigoPOSDashboard() {
     }
   };
 
+  // 1. Loading splash screen while checking session
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen w-full bg-[#0F172A] flex flex-col items-center justify-center p-4 text-white">
+        <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4" />
+        <p className="font-extrabold text-sm tracking-wide text-slate-300">Memeriksa Sesi Login Kasir...</p>
+      </div>
+    );
+  }
+
+  // 2. If not authenticated, render Login Screen
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          showToast("Selamat Datang!", "Berhasil masuk sebagai " + user.name);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col md:flex-row antialiased text-left w-full">
       {/* Toast Notification */}
@@ -817,15 +856,24 @@ export default function IndigoPOSDashboard() {
               </nav>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 text-left">
-              <div className="flex items-center justify-start gap-3 p-2 rounded-xl bg-slate-50 text-left">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200 shrink-0">
-                  MS
+            <div className="pt-4 border-t border-slate-100 text-left space-y-2">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 text-left">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white flex items-center justify-center font-black text-xs shadow-sm shrink-0">
+                    {currentUser.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="text-left overflow-hidden">
+                    <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{currentUser.role === "OWNER" ? "Pemilik Usaha" : "Admin Outlet"}</p>
+                  </div>
                 </div>
-                <div className="text-left overflow-hidden">
-                  <p className="text-xs font-bold text-slate-900 truncate">Mario Sitepu</p>
-                  <p className="text-[10px] text-slate-500 truncate">Pemilik Usaha</p>
-                </div>
+                <button
+                  onClick={() => setIsLogoutModalOpen(true)}
+                  className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                  title="Keluar / Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -907,14 +955,23 @@ export default function IndigoPOSDashboard() {
         </div>
 
         <div className="pt-4 border-t border-slate-100 text-left">
-          <div className="flex items-center justify-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs border border-indigo-200 shrink-0">
-              MS
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-200/60 text-left">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white flex items-center justify-center font-black text-xs shadow-md shrink-0">
+                {currentUser.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="text-left overflow-hidden">
+                <p className="text-xs font-extrabold text-slate-900 truncate text-left">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-500 font-semibold truncate text-left">{currentUser.role === "OWNER" ? "Pemilik Usaha" : "Admin Outlet"}</p>
+              </div>
             </div>
-            <div className="text-left overflow-hidden">
-              <p className="text-xs font-bold text-slate-900 truncate text-left">Mario Sitepu</p>
-              <p className="text-[11px] text-slate-500 truncate text-left">Pemilik Usaha</p>
-            </div>
+            <button
+              onClick={() => setIsLogoutModalOpen(true)}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="Keluar / Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>
@@ -2177,6 +2234,47 @@ export default function IndigoPOSDashboard() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: KONFIRMASI LOGOUT ================= */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                <LogOut className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">Keluar dari Portal?</h3>
+                <p className="text-xs text-slate-500">Anda harus memasukkan kata sandi kembali untuk masuk.</p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logoutAdmin();
+                  setCurrentUser(null);
+                  setIsLogoutModalOpen(false);
+                  showToast("Berhasil Keluar", "Sesi login telah diakhiri dengan aman.");
+                }}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200 transition-all flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Ya, Keluar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

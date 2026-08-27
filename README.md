@@ -78,4 +78,19 @@ npm run start
 ---
 
 ## ?? Lisensi
-Hak Cipta © 2026 Sapo Sapo POS Project.
+Hak Cipta ï¿½ 2026 Sapo Sapo POS Project.
+
+
+---
+
+## ?? Akun & Hak Akses Login
+
+Sistem web admin dilengkapi gerbang autentikasi (*Login Portal*) untuk melindungi data omzet dan menu:
+
+| Role / Jabatan | Username / Email | Password Default | Hak Akses |
+| :--- | :--- | :--- | :--- |
+| **Owner (Pemilik Toko)** | `admin` / `admin@saposapo.com` | `sapo123` | Akses penuh seluruh dashboard, laporan, mutasi stok, edit harga & reset database |
+| **Owner (Mario Sitepu)** | `mario` / `mario@saposapo.com` | `sapo123` | Akses penuh pemilik usaha |
+| **Kasir / Staf Outlet** | `kasir` / `kasir@saposapo.com` | `kasir123` | Akses monitoring stok & rekap penjualan harian |
+
+> ?? *Untuk mengganti password master owner, Anda dapat menambahkan variabel `NEXT_PUBLIC_ADMIN_PASSWORD` di file `.env.local` atau di pengaturan Environment Variables Vercel.*
