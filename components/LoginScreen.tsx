@@ -133,7 +133,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="��������"
+                  placeholder="Password admin"
                   className="w-full bg-slate-800/90 border border-slate-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold"
                 />
                 <button
@@ -185,7 +185,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500">
-          <p>Sapo Sapo Ayam Geprek � Jl. Parang 1, Medan</p>
+          <p>Sapo Sapo Ayam Geprek - Jl. Parang 1, Medan</p>
           <p className="text-[10px] mt-0.5 text-slate-600">Sistem Kasir Terintegrasi Android POS & Cloud Firebase</p>
         </div>
       </div>

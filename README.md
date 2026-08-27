@@ -85,4 +85,4 @@ Buka browser di [http://localhost:3000](http://localhost:3000).
 ---
 
 ## ?? Lisensi
-Hak Cipta � 2026 Sapo Sapo POS Project.
+Hak Cipta (c) 2026 Sapo Sapo POS Project.

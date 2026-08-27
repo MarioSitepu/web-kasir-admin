@@ -1152,7 +1152,7 @@ export default function IndigoPOSDashboard() {
                       <div className="text-left">
                         <div className="flex items-center justify-start gap-1.5 text-xs font-bold text-slate-800 text-left">
                           <span className="text-left">{t.paymentMethod}</span>
-                          <span className="text-slate-400">�</span>
+                          <span className="text-slate-400">&bull;</span>
                           <span className="font-mono text-slate-500 text-[11px] text-left">{t.invoiceNumber || t.id}</span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5 text-left">{formatDate(t.createdAt)}</p>
@@ -2056,7 +2056,7 @@ export default function IndigoPOSDashboard() {
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      [{p.category}] {p.name} � (Stok Saat Ini: {p.stockQuantity ?? 50} unit)
+                      [{p.category}] {p.name} - (Stok Saat Ini: {p.stockQuantity ?? 50} unit)
                     </option>
                   ))}
                 </select>
