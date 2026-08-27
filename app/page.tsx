@@ -1035,57 +1035,76 @@ export default function IndigoPOSDashboard() {
         {activeTab === "overview" && (
           <div className="space-y-6 w-full text-left">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 w-full text-left">
-              <div className="figma-card p-5 text-left">
+              {/* KARTU 1: OMZET HARI INI */}
+              <div className="figma-card p-5 text-left bg-white border border-slate-200/80 rounded-2xl shadow-sm">
                 <div className="flex items-center justify-between text-left">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Penjualan Hari Ini</span>
-                  <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    +12% dibanding kemarin
+                  <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/70 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 text-emerald-600" />
+                    <span>Real-Time</span>
                   </span>
                 </div>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
+                <div className="text-2xl font-black text-slate-900 tracking-tight mt-3 text-left">
                   {formatIDR(metrics.todaySales)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Diperbarui realtime</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Total omzet terverifikasi hari ini</p>
               </div>
 
-              <div className="figma-card p-5 text-left">
+              {/* KARTU 2: TOTAL TRANSAKSI */}
+              <div className="figma-card p-5 text-left bg-white border border-slate-200/80 rounded-2xl shadow-sm">
                 <div className="flex items-center justify-between text-left">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Total Transaksi</span>
-                  <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    +5% dibanding kemarin
+                  <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/70 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                    <span>Selesai</span>
                   </span>
                 </div>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3 text-left">
-                  {metrics.todayOrders} Struk Kasir
+                <div className="text-2xl font-black text-slate-900 tracking-tight mt-3 text-left">
+                  {metrics.todayOrders} <span className="text-base font-bold text-slate-600">Pesanan</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Dari Tablet Kasir Android</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Struk terbit dari Kasir Android</p>
               </div>
 
-              <div className="figma-card p-5 text-left">
+              {/* KARTU 3: MENU TERLARIS */}
+              <div className="figma-card p-5 text-left bg-white border border-slate-200/80 rounded-2xl shadow-sm">
                 <div className="flex items-center justify-between text-left">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Menu Paling Laris</span>
-                  <span className="text-xs text-indigo-600 font-bold">? Terlaris</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Menu Terlaris</span>
+                  <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/70 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>Favorit</span>
+                  </span>
                 </div>
-                <div className="text-lg font-extrabold text-slate-900 tracking-tight mt-3 truncate text-left">
+                <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight mt-3 truncate text-left" title={metrics.topItem.name}>
                   {metrics.topItem.name}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium text-left">{metrics.topItem.qty > 0 ? metrics.topItem.qty + " porsi terjual" : "0 transaksi"}</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium text-left">
+                  {metrics.topItem.qty > 0 ? (
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
+                      {metrics.topItem.qty} porsi terjual ({formatIDR(metrics.topItem.revenue)})
+                    </span>
+                  ) : (
+                    "Belum ada penjualan hari ini"
+                  )}
+                </p>
               </div>
 
-              <div className="figma-card p-5 text-left">
+              {/* KARTU 4: STOK MENIPIS */}
+              <div className="figma-card p-5 text-left bg-white border border-slate-200/80 rounded-2xl shadow-sm">
                 <div className="flex items-center justify-between text-left">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Stok Menipis</span>
                   <button
                     onClick={() => setActiveTab("inventory")}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold text-left"
+                    className="text-[11px] text-indigo-600 hover:text-indigo-700 font-extrabold text-left underline cursor-pointer"
                   >
-                    Lihat &rarr;
+                    Lihat Detail &rarr;
                   </button>
                 </div>
-                <div className="text-2xl font-extrabold text-rose-600 tracking-tight mt-3 text-left">
-                  {metrics.lowStockCount} Menu
+                <div className="text-2xl font-black text-rose-600 tracking-tight mt-3 text-left">
+                  {metrics.lowStockCount} <span className="text-base font-bold text-slate-600">Menu</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium text-left">Perlu restock segera</p>
+                <p className="text-xs text-slate-400 mt-1 font-medium text-left">
+                  {metrics.lowStockCount > 0 ? "Perlu restock segera" : "Semua stok menu aman"}
+                </p>
               </div>
             </div>
 
