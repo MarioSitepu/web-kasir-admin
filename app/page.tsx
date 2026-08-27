@@ -2097,17 +2097,7 @@ export default function IndigoPOSDashboard() {
                 )}
               </div>
 
-              {/* 5. KETERANGAN / NO SURAT JALAN */}
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1 text-left">Keterangan / No. Surat Jalan</label>
-                <input
-                  type="text"
-                  value={stockNotesInput}
-                  onChange={(e) => setStockNotesInput(e.target.value)}
-                  placeholder={stockModalType === "IN" ? "Contoh: Kiriman Supplier CV Mandiri" : "Contoh: Kadaluarsa / Rusak Kemasan"}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
-                />
-              </div>
+
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
                 <button
