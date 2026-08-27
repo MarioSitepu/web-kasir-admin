@@ -28,7 +28,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identity.trim() || !password.trim()) {
-      setErrorMessage("Silakan masukkan username/email dan kata sandi.");
+      setErrorMessage("Silakan masukkan username dan kata sandi.");
       return;
     }
 
@@ -49,9 +49,9 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     }
   };
 
-  const handleQuickFill = (u: string, p: string) => {
-    setIdentity(u);
-    setPassword(p);
+  const handleQuickFill = () => {
+    setIdentity("admin");
+    setPassword("sapo123");
     setErrorMessage(null);
   };
 
@@ -76,7 +76,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               </span>
             </h1>
             <p className="text-xs text-slate-400 font-medium mt-1">
-              Portal Monitoring Penjualan & Dashboard Manajemen Toko
+              Portal Monitoring Penjualan & Dashboard Admin
             </p>
           </div>
         </div>
@@ -85,8 +85,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/50 space-y-6">
           <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-white">Masuk ke Portal Admin</h2>
-              <p className="text-xs text-slate-400">Gunakan akun pemilik atau staf terdaftar</p>
+              <h2 className="text-base font-bold text-white">Login Admin</h2>
+              <p className="text-xs text-slate-400">Masukkan akun administrator untuk melanjutkan</p>
             </div>
             <div className="p-2 rounded-xl bg-slate-800/80 text-indigo-400 border border-slate-700/60">
               <ShieldCheck className="w-5 h-5" />
@@ -104,7 +104,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
             {/* Input: Username / Email */}
             <div className="space-y-1.5 text-left">
-              <label className="block font-bold text-slate-300">Username atau Email</label>
+              <label className="block font-bold text-slate-300">Username Admin</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <User className="w-4 h-4" />
@@ -114,7 +114,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   required
                   value={identity}
                   onChange={(e) => setIdentity(e.target.value)}
-                  placeholder="Contoh: admin atau mario"
+                  placeholder="admin"
                   autoCapitalize="none"
                   className="w-full bg-slate-800/90 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold"
                 />
@@ -133,7 +133,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Masukkan kata sandi..."
+                  placeholder="��������"
                   className="w-full bg-slate-800/90 border border-slate-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold"
                 />
                 <button
@@ -167,29 +167,19 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </form>
 
           {/* Quick Access Account Pill */}
-          <div className="pt-4 border-t border-slate-800/80 space-y-2 text-left">
-            <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+          <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-left">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Akun Masuk Bawaan (Default):</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill("admin", "sapo123")}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-[11px] font-medium text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="font-bold text-indigo-400">Owner:</span>
-                <code>admin / sapo123</code>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill("kasir", "kasir123")}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-[11px] font-medium text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="font-bold text-emerald-400">Kasir:</span>
-                <code>kasir / kasir123</code>
-              </button>
-            </div>
+              <span>Akun Bawaan:</span>
+            </span>
+            <button
+              type="button"
+              onClick={handleQuickFill}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-[11px] font-medium text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="font-bold text-indigo-400">Admin:</span>
+              <code>admin / sapo123</code>
+            </button>
           </div>
         </div>
 

@@ -2,37 +2,21 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: "OWNER" | "ADMIN" | "SUPERVISOR";
+  role: "OWNER" | "ADMIN";
   avatarUrl?: string;
   loginAt: number;
 }
 
 const AUTH_STORAGE_KEY = "sapo_kasir_admin_session";
 
-// Default Master Credentials
-const MASTER_ACCOUNTS = [
-  {
-    username: "admin",
-    email: "admin@saposapo.com",
-    name: "Mario Sitepu",
-    role: "OWNER" as const,
-    password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "sapo123",
-  },
-  {
-    username: "mario",
-    email: "mario@saposapo.com",
-    name: "Mario Sitepu (Pemilik)",
-    role: "OWNER" as const,
-    password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "sapo123",
-  },
-  {
-    username: "kasir",
-    email: "kasir@saposapo.com",
-    name: "Petugas Kasir Outlet",
-    role: "ADMIN" as const,
-    password: "kasir123",
-  }
-];
+// Single Master Administrator Account
+const MASTER_ACCOUNT = {
+  username: "admin",
+  email: "admin@saposapo.com",
+  name: "Mario Sitepu (Admin)",
+  role: "OWNER" as const,
+  password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "sapo123",
+};
 
 export const getStoredSession = (): AuthUser | null => {
   if (typeof window === "undefined") return null;
@@ -56,30 +40,30 @@ export const loginAdmin = async (
   pass: string
 ): Promise<{ success: boolean; user?: AuthUser; error?: string }> => {
   // Simulate brief realistic async auth delay
-  await new Promise((res) => setTimeout(res, 450));
+  await new Promise((res) => setTimeout(res, 400));
 
   const cleanIdentity = identity.trim().toLowerCase();
   const cleanPass = pass.trim();
 
-  const matched = MASTER_ACCOUNTS.find(
-    (acc) =>
-      (acc.username.toLowerCase() === cleanIdentity ||
-        acc.email.toLowerCase() === cleanIdentity) &&
-      acc.password === cleanPass
-  );
+  const isUsernameMatch =
+    cleanIdentity === MASTER_ACCOUNT.username.toLowerCase() ||
+    cleanIdentity === MASTER_ACCOUNT.email.toLowerCase() ||
+    cleanIdentity === "mario";
 
-  if (!matched) {
+  const isPasswordMatch = cleanPass === MASTER_ACCOUNT.password;
+
+  if (!isUsernameMatch || !isPasswordMatch) {
     return {
       success: false,
-      error: "Username/Email atau Kata Sandi salah. Silakan periksa kembali.",
+      error: "Username atau Kata Sandi salah. Silakan periksa kembali.",
     };
   }
 
   const user: AuthUser = {
-    id: "usr_" + matched.username,
-    name: matched.name,
-    email: matched.email,
-    role: matched.role,
+    id: "usr_admin",
+    name: MASTER_ACCOUNT.name,
+    email: MASTER_ACCOUNT.email,
+    role: MASTER_ACCOUNT.role,
     loginAt: Date.now(),
   };
 

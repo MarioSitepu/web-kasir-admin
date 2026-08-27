@@ -19,7 +19,8 @@ Dibuat khusus untuk mendukung integrasi real-time dengan **Aplikasi Kasir POS An
 
 ### 3. ?? Inventaris & Riwayat Mutasi Stok
 - Monitoring peringatan stok menipis (*Low Stock Alert*).
-- Riwayat log mutasi stok lengkap dengan timestamp, tipe perubahan (*Penjualan Kasir, Restock Manual, Reset Audit*), dan nominal perubahan.
+- Pemilihan barang cepat untuk **Tambah / Atur Stok** dengan simulasi stok real-time.
+- Riwayat log mutasi stok lengkap dengan timestamp dan tipe perubahan.
 
 ### 4. ?? Laporan Transaksi & Keuangan
 - Rekap transaksi harian & riwayat pesanan (Metode pembayaran Tunai / QRIS Dinamis).
@@ -28,6 +29,18 @@ Dibuat khusus untuk mendukung integrasi real-time dengan **Aplikasi Kasir POS An
 ### 5. ?? Pemeliharaan & Audit Database
 - Fitur **Hapus & Reset Data Terpilih** dengan konfirmasi keamanan berlapis untuk pengujian atau pergantian periode pembukuan toko.
 - Log audit otomatis mencatat riwayat pembersihan data.
+
+---
+
+## ?? Akun Login Administrator
+
+Sistem web admin dilindungi gerbang autentikasi tunggal khusus Administrator / Pemilik Toko:
+
+| Role / Akun | Username | Password Default | Hak Akses |
+| :--- | :--- | :--- | :--- |
+| **Administrator (Owner)** | `admin` *(atau `mario`)* | `sapo123` | Akses penuh dashboard omzet, edit menu & harga, mutasi stok, laporan transaksi & reset database |
+
+> ?? *Untuk mengubah kata sandi admin, Anda dapat mengatur variabel `NEXT_PUBLIC_ADMIN_PASSWORD` di file `.env.local` atau di pengaturan Environment Variables Vercel.*
 
 ---
 
@@ -59,12 +72,6 @@ npm run dev
 ```
 Buka browser di [http://localhost:3000](http://localhost:3000).
 
-### 4. Build Production Bundle
-```bash
-npm run build
-npm run start
-```
-
 ---
 
 ## ?? Cara Deploy ke Vercel (1-Click Deployment)
@@ -79,18 +86,3 @@ npm run start
 
 ## ?? Lisensi
 Hak Cipta � 2026 Sapo Sapo POS Project.
-
-
----
-
-## ?? Akun & Hak Akses Login
-
-Sistem web admin dilengkapi gerbang autentikasi (*Login Portal*) untuk melindungi data omzet dan menu:
-
-| Role / Jabatan | Username / Email | Password Default | Hak Akses |
-| :--- | :--- | :--- | :--- |
-| **Owner (Pemilik Toko)** | `admin` / `admin@saposapo.com` | `sapo123` | Akses penuh seluruh dashboard, laporan, mutasi stok, edit harga & reset database |
-| **Owner (Mario Sitepu)** | `mario` / `mario@saposapo.com` | `sapo123` | Akses penuh pemilik usaha |
-| **Kasir / Staf Outlet** | `kasir` / `kasir@saposapo.com` | `kasir123` | Akses monitoring stok & rekap penjualan harian |
-
-> ?? *Untuk mengganti password master owner, Anda dapat menambahkan variabel `NEXT_PUBLIC_ADMIN_PASSWORD` di file `.env.local` atau di pengaturan Environment Variables Vercel.*
