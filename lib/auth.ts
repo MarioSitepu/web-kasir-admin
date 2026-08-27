@@ -13,7 +13,7 @@ const AUTH_STORAGE_KEY = "sapo_kasir_admin_session";
 const MASTER_ACCOUNT = {
   username: "admin",
   email: "admin@saposapo.com",
-  name: "Mario Sitepu (Admin)",
+  name: "Admin",
   role: "OWNER" as const,
   password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "sapo123",
 };

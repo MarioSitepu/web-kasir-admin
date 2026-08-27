@@ -609,7 +609,7 @@ export default function IndigoPOSDashboard() {
           previousStock: 0,
           currentStock: stockNum,
           notes: "Stok awal saat tambah menu baru",
-          createdBy: "Mario Sitepu (Pemilik)",
+          createdBy: "Admin",
           timestamp: now,
         });
         showToast("Menu Berhasil Ditambah", '"' + formData.name + '" sekarang muncul di tablet kasir.');
@@ -692,7 +692,7 @@ export default function IndigoPOSDashboard() {
         previousStock: prevStock,
         currentStock: newStock,
         notes: stockNotesInput || (stockModalType === "IN" ? "Restock dari Supplier" : "Barang Rusak / Basi"),
-        createdBy: "Mario Sitepu (Pemilik)",
+        createdBy: "Admin",
         timestamp: now,
       });
 
@@ -864,7 +864,7 @@ export default function IndigoPOSDashboard() {
                   </div>
                   <div className="text-left overflow-hidden">
                     <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{currentUser.role === "OWNER" ? "Pemilik Usaha" : "Admin Outlet"}</p>
+                    <p className="text-[10px] text-slate-500 truncate">"Administrator"</p>
                   </div>
                 </div>
                 <button
@@ -962,7 +962,7 @@ export default function IndigoPOSDashboard() {
               </div>
               <div className="text-left overflow-hidden">
                 <p className="text-xs font-extrabold text-slate-900 truncate text-left">{currentUser.name}</p>
-                <p className="text-[10px] text-slate-500 font-semibold truncate text-left">{currentUser.role === "OWNER" ? "Pemilik Usaha" : "Admin Outlet"}</p>
+                <p className="text-[10px] text-slate-500 font-semibold truncate text-left">"Administrator"</p>
               </div>
             </div>
             <button
@@ -1430,7 +1430,7 @@ export default function IndigoPOSDashboard() {
                               {log.type === "IN" ? "+" + log.quantity + " (Masuk)" : "-" + log.quantity + " (Keluar)"}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-600 text-left">{log.createdBy || "Mario Sitepu"}</td>
+                          <td className="py-3.5 px-4 text-slate-600 text-left">{log.createdBy || "Admin"}</td>
                           <td className="py-3.5 px-5 text-slate-500 text-left">{log.notes || "Restock dari Supplier"}</td>
                         </tr>
                       ))
