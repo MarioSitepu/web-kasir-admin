@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ?? Web Admin Kasir - Sapo Sapo (Next.js & Firebase)
 
-## Getting Started
+Dashboard web admin modern & responsif untuk manajemen operasional kasir, inventaris produk, pencatatan mutasi stok, rekap transaksi penjualan real-time, dan pemeliharaan database cloud.
 
-First, run the development server:
+Dibuat khusus untuk mendukung integrasi real-time dengan **Aplikasi Kasir POS Android (Kassen BTP299 Bluetooth/USB OTG)**.
 
+---
+
+## ? Fitur Utama Web Admin
+
+### 1. ?? Dashboard & Monitoring Real-Time
+- **Statistik Penjualan**: Pantau total omzet hari ini, estimasi laba bersih, jumlah transaksi, dan menu terlaris (*best seller*).
+- **Grafik Tren Penjualan**: Visualisasi grafik interaktif omzet dan transaksi harian/mingguan.
+- **Sinkronisasi Otomatis**: Terhubung langsung ke **Firebase Realtime Database & Cloud Firestore**. Setiap transaksi di kasir Android langsung tercatat di web admin seketika tanpa perlu refresh browser.
+
+### 2. ?? Manajemen Produk & Menu
+- Tambah, ubah, dan hapus menu dengan cepat (Nama, Kategori, Harga, Stok, Deskripsi, dan Foto URL).
+- Filter berdasarkan kategori (*Makanan, Minuman, Snack, Paket*) dan pencarian instan.
+
+### 3. ?? Inventaris & Riwayat Mutasi Stok
+- Monitoring peringatan stok menipis (*Low Stock Alert*).
+- Riwayat log mutasi stok lengkap dengan timestamp, tipe perubahan (*Penjualan Kasir, Restock Manual, Reset Audit*), dan nominal perubahan.
+
+### 4. ?? Laporan Transaksi & Keuangan
+- Rekap transaksi harian & riwayat pesanan (Metode pembayaran Tunai / QRIS Dinamis).
+- Cetak struk ulang 58mm langsung dari browser menggunakan driver cetak thermal web.
+
+### 5. ?? Pemeliharaan & Audit Database
+- Fitur **Hapus & Reset Data Terpilih** dengan konfirmasi keamanan berlapis untuk pengujian atau pergantian periode pembukuan toko.
+- Log audit otomatis mencatat riwayat pembersihan data.
+
+---
+
+## ??? Teknologi & Stack
+
+- **Framework**: [Next.js 16 (App Router)](https://nextjs.org/)
+- **UI & Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & [Lucide Icons](https://lucide.dev/)
+- **Database**: [Firebase Realtime Database & Cloud Firestore](https://firebase.google.com/)
+- **Deployment**: [Vercel](https://vercel.com/) (Zero-Config Deployment)
+
+---
+
+## ?? Panduan Menjalankan di Komputer Lokal
+
+### 1. Clone & Masuk ke Direktori
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/MarioSitepu/web-kasir-admin.git
+cd web-kasir-admin
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Jalankan Development Server
+```bash
+npm run dev
+```
+Buka browser di [http://localhost:3000](http://localhost:3000).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Build Production Bundle
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## ?? Cara Deploy ke Vercel (1-Click Deployment)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Buka [vercel.com](https://vercel.com) dan login menggunakan akun GitHub Anda.
+2. Klik **`Add New...`** $\rightarrow$ **`Project`**.
+3. Pilih repository **`MarioSitepu/web-kasir-admin`**.
+4. Framework Preset akan otomatis terdeteksi sebagai **Next.js**.
+5. Klik **`Deploy`**! Website admin Anda langsung online dengan domain gratis `.vercel.app` & HTTPS otomatis.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ?? Lisensi
+Hak Cipta © 2026 Sapo Sapo POS Project.
