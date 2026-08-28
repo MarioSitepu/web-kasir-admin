@@ -158,6 +158,8 @@ export default function IndigoPOSDashboard() {
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "month" | "all">("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all"); // format YYYY-MM or 'all'
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
   const [reportProductFilter, setReportProductFilter] = useState<string>("all");
   const [reportMenuSortBy, setReportMenuSortBy] = useState<"qty_desc" | "rev_desc" | "qty_asc" | "name_asc">("qty_desc");
   const [reportMenuSearch, setReportMenuSearch] = useState<string>("");
@@ -744,6 +746,9 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const finalCategory = isCustomCategory && customCategoryInput.trim()
+        ? customCategoryInput.trim()
+        : (formData.category || "Makanan");
       const priceNum = parseFloat(formData.price) || 0;
       const stockNum = parseInt(formData.stockQuantity) || 0;
       const img = formData.imageUrl || "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400";
@@ -755,7 +760,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
           name: formData.name,
           sku: formData.sku || "SKU-" + Date.now().toString().slice(-4),
           price: priceNum,
-          category: formData.category,
+          category: finalCategory,
           stock_quantity: stockNum,
           stockQuantity: stockNum,
           image_url: img,
@@ -773,7 +778,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
           sku: formData.sku || "SKU-" + Date.now().toString().slice(-4),
           name: formData.name,
           price: priceNum,
-          category: formData.category,
+          category: finalCategory,
           stock_quantity: stockNum,
           stockQuantity: stockNum,
           min_stock_alert: 10,
@@ -1915,7 +1920,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
                   {/* Kategori Filter Pills */}
                   <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 font-bold">
-                    {["Semua", "Makanan", "Minuman", "Snack"].map((cat) => (
+                    {categories.map((c) => c.id).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setReportCategoryFilter(cat)}
