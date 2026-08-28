@@ -2292,6 +2292,293 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
         )}
       </main>
 
+      
+      {/* ================= MODAL: TAMBAH / EDIT MENU BARU ================= */}
+      {(isAddProductOpen || isEditProductOpen) && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-4 text-left max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="flex items-center gap-2.5 text-left">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                  <UtensilsCrossed className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">
+                    {editingProduct ? "Edit Menu & Harga" : "Tambah Menu Baru"}
+                  </h3>
+                  <p className="text-xs text-slate-400 text-left">
+                    Tersinkronisasi otomatis ke aplikasi kasir tablet
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddProductOpen(false);
+                  setIsEditProductOpen(false);
+                  setEditingProduct(null);
+                }}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-medium text-left">
+              {/* 1. NAMA MENU */}
+              <div className="space-y-1 text-left">
+                <label className="block font-bold text-slate-700 text-xs">Nama Menu Makanan / Minuman *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Paket Ayam Geprek Sambal Matah"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* 2. KATEGORI & SKU */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-xs">Kategori Menu *</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value, sku: generateSKU(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="Makanan">Makanan</option>
+                    <option value="Minuman">Minuman</option>
+                    <option value="Snack">Snack / Camilan</option>
+                    <option value="Paket Hemat">Paket Hemat</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-xs">Kode SKU (Auto)</label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-slate-700 font-bold text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* 3. HARGA & STOK AWAL */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-xs">Harga Jual (Rp) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    required
+                    placeholder="Contoh: 15000"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-xs">
+                    {editingProduct ? "Stok Saat Ini (Unit) *" : "Stok Awal (Unit) *"}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="Contoh: 50"
+                    value={formData.stockQuantity}
+                    onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* 4. FOTO / GAMBAR MENU */}
+              <div className="space-y-1.5 text-left">
+                <label className="block font-bold text-slate-700 text-xs">URL Foto Menu (Opsional)</label>
+                <div className="flex gap-2 text-left">
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/..."
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                  {formData.imageUrl && (
+                    <div className="w-9 h-9 rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                      <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+                {/* Presets cepat */}
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold mr-1 self-center">Pilihan Cepat:</span>
+                  {[
+                    { label: "Ayam Geprek", url: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400" },
+                    { label: "Es Teh", url: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400" },
+                    { label: "Kopi", url: "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400" },
+                    { label: "Jus Buah", url: "https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400" },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imageUrl: p.url })}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 text-[10px] font-bold transition-colors cursor-pointer"
+                    >
+                      + {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5. STATUS MENU AKTIF */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-800 text-xs">Status Menu Kasir</p>
+                  <p className="text-[11px] text-slate-400">Menu akan langsung muncul di kasir saat aktif</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddProductOpen(false);
+                    setIsEditProductOpen(false);
+                    setEditingProduct(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{editingProduct ? "Simpan Perubahan" : "Tambahkan Menu"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: HAPUS RIWAYAT DATABASE / BULANAN ================= */}
+      {isDeleteMonthModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="flex items-center gap-2.5 text-left">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left">Pembersihan Riwayat Data</h3>
+                  <p className="text-xs text-slate-400 text-left">Hapus transaksi lama untuk merapikan penyimpanan</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteMonthModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-left">
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-700 text-xs">Pilih Cakupan Data Yang Akan Dihapus:</label>
+                <select
+                  value={deleteScope}
+                  onChange={(e) => setDeleteScope(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                >
+                  <option value="month">Hapus Riwayat Bulan Tertentu</option>
+                  <option value="all_logs">Hapus Seluruh Buku Mutasi Stok</option>
+                  <option value="all_transactions">Hapus Seluruh Riwayat Transaksi</option>
+                  <option value="reset_all">Reset Total (Transaksi & Mutasi Stok)</option>
+                </select>
+              </div>
+
+              {deleteScope === "month" && (
+                <div className="space-y-1">
+                  <label className="block font-bold text-slate-700 text-xs">Pilih Bulan Yang Dihapus:</label>
+                  <select
+                    value={monthToDelete}
+                    onChange={(e) => setMonthToDelete(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {availableMonths.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-800 space-y-1">
+                <p className="font-extrabold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Peringatan Penghapusan Data</span>
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Data yang dihapus tidak dapat dipulihkan kembali. Pastikan Anda telah mengunduh laporan CSV sebelum menghapus.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isConfirmedCheckbox}
+                  onChange={(e) => setIsConfirmedCheckbox(e.target.checked)}
+                  className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 w-4 h-4"
+                />
+                <span className="text-xs font-bold text-slate-700">Saya yakin ingin menghapus data ini</span>
+              </label>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setIsDeleteMonthModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={!isConfirmedCheckbox || isDeleting}
+                onClick={handleDeleteMonthTransactions}
+                className={"px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 " + (
+                  isConfirmedCheckbox && !isDeleting
+                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-xs shadow-rose-200 cursor-pointer"
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? "Sedang Menghapus..." : "Hapus Permanen"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: ATUR STOK DENGAN PILIHAN BARANG ================= */}
       {isStockModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
