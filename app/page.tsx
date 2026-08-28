@@ -546,7 +546,81 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
     const freeTierLimitMB = 1000; // 1 GB = 1000 MB
     const storageUsagePercent = Math.max(0.01, ((totalBytes / (1024 * 1024 * 1000)) * 100)).toFixed(2);
 
-    const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+    // --- REALTIME 7 DAYS REVENUE BREAKDOWN FROM DATABASE ---
+    const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+    const last7Days: {
+      dateStr: string;
+      dayName: string;
+      shortDate: string;
+      fullDate: string;
+      revenue: number;
+      orderCount: number;
+      pctOfMax: number;
+      x: number;
+      y: number;
+    }[] = [];
+
+    let maxDailyRev = 10000; // minimum floor for visual scaling
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+
+      const dayTx = transactions.filter((t) => (t.createdAt || 0) >= dayStart && (t.createdAt || 0) <= dayEnd);
+      const dailyRevenue = dayTx.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
+      const orderCount = dayTx.length;
+
+      if (dailyRevenue > maxDailyRev) {
+        maxDailyRev = dailyRevenue;
+      }
+
+      const dayName = i === 0 ? "Hari Ini" : dayNames[d.getDay()];
+      const shortDate = d.getDate() + "/" + (d.getMonth() + 1);
+      const fullDate = d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short" });
+
+      last7Days.push({
+        dateStr: d.toISOString().slice(0, 10),
+        dayName,
+        shortDate,
+        fullDate,
+        revenue: dailyRevenue,
+        orderCount,
+        pctOfMax: 0,
+        x: Math.round(((6 - i) / 6) * 640) + 30, // x coordinate in 700 width viewBox
+        y: 135, // default baseline
+      });
+    }
+
+    // Compute coordinates and heights
+    last7Days.forEach((d) => {
+      d.pctOfMax = maxDailyRev > 0 ? Math.round((d.revenue / maxDailyRev) * 100) : 0;
+      // y-range: from 135 (0 rev) up to 25 (max rev)
+      d.y = Math.round(135 - (d.pctOfMax / 100) * 110);
+    });
+
+    const total7DaysSales = last7Days.reduce((acc, d) => acc + d.revenue, 0);
+    const total7DaysOrders = last7Days.reduce((acc, d) => acc + d.orderCount, 0);
+
+    // Build smooth SVG curve path and area path from real data
+    const pts = last7Days.map((p) => p.x + " " + p.y);
+    let svgLinePath = "M " + pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      const prev = last7Days[i - 1];
+      const curr = last7Days[i];
+      const cpX1 = prev.x + (curr.x - prev.x) / 2;
+      const cpY1 = prev.y;
+      const cpX2 = prev.x + (curr.x - prev.x) / 2;
+      const cpY2 = curr.y;
+      svgLinePath += " C " + cpX1 + " " + cpY1 + ", " + cpX2 + " " + cpY2 + ", " + curr.x + " " + curr.y;
+    }
+
+    const firstPt = last7Days[0];
+    const lastPt = last7Days[last7Days.length - 1];
+    const svgAreaPath = svgLinePath + " L " + lastPt.x + " 155 L " + firstPt.x + " 155 Z";
+
+    const days = last7Days.map((d) => d.dayName);
+
     return {
       todaySales,
       todayOrders,
@@ -558,17 +632,20 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
       cashTotal,
       qrisTotal,
       transferTotal,
-      cashPct,
       qrisPct,
+      cashPct,
       transferPct,
-      totalBytes,
       totalKB,
       totalMB,
-      freeTierLimitMB,
       storageUsagePercent,
       days,
-    };
-  }, [transactions, products, inventoryLogs, filteredTransactions]);
+      last7Days,
+      maxDailyRev,
+      total7DaysSales,
+      total7DaysOrders,
+      svgLinePath,
+      svgAreaPath,
+    };}, [transactions, products, inventoryLogs, filteredTransactions]);
 
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
@@ -1219,42 +1296,94 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
-              <div className="lg:col-span-7 figma-card p-6 text-left">
-                <div className="flex items-center justify-between mb-4 text-left">
+              <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 text-left">
                   <div className="text-left">
-                    <h3 className="font-extrabold text-base text-slate-900 text-left">Tren Penjualan (7 Hari Terakhir)</h3>
-                    <p className="text-xs text-slate-400 text-left">Grafik performa pendapatan harian</p>
+                    <h3 className="font-extrabold text-base text-slate-900 text-left flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-indigo-600" />
+                      <span>Tren Penjualan (7 Hari Terakhir)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 text-left">
+                      Grafik pendapatan harian otomatis dari database kasir
+                    </p>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg">
-                    Mingguan
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg">
+                      7 Hari: {formatIDR(metrics.total7DaysSales)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="mt-6 w-full text-left">
-                  <div className="h-44 w-full relative flex items-end">
+                {/* DYNAMIC REALTIME DATABASE CHART */}
+                <div className="mt-4 w-full text-left">
+                  <div className="h-48 w-full relative flex items-end">
                     <svg className="w-full h-full overflow-visible" viewBox="0 0 700 160" preserveAspectRatio="none">
                       <defs>
-                        <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366F1" stopOpacity="0.35" />
-                          <stop offset="100%" stopColor="#6366F1" stopOpacity="0.0" />
+                        <linearGradient id="purpleGradReal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.30" />
+                          <stop offset="100%" stopColor="#4F46E5" stopOpacity="0.0" />
                         </linearGradient>
                       </defs>
+
+                      {/* Horizontal Grid lines */}
+                      <line x1="20" y1="25" x2="680" y2="25" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="4 4" />
+                      <line x1="20" y1="80" x2="680" y2="80" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="4 4" />
+                      <line x1="20" y1="135" x2="680" y2="135" stroke="#F1F5F9" strokeWidth="1" />
+
+                      {/* Filled Area Gradient */}
                       <path
-                        d="M 0 130 C 100 90, 150 110, 230 70 C 310 30, 420 50, 490 20 C 560 -10, 630 30, 700 15 L 700 160 L 0 160 Z"
-                        fill="url(#purpleGrad)"
+                        d={metrics.svgAreaPath}
+                        fill="url(#purpleGradReal)"
                       />
+
+                      {/* Real Data Smooth Line */}
                       <path
-                        d="M 0 130 C 100 90, 150 110, 230 70 C 310 30, 420 50, 490 20 C 560 -10, 630 30, 700 15"
+                        d={metrics.svgLinePath}
                         fill="none"
                         stroke="#4F46E5"
                         strokeWidth="3.5"
                         strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
+
+                      {/* Real Data Point Dots */}
+                      {metrics.last7Days.map((d, idx) => (
+                        <g key={d.dateStr + "_" + idx}>
+                          <circle
+                            cx={d.x}
+                            cy={d.y}
+                            r={idx === 6 ? "5.5" : "4.5"}
+                            className={idx === 6 ? "fill-indigo-600 stroke-white stroke-2" : "fill-indigo-500 stroke-white stroke-2"}
+                          />
+                        </g>
+                      ))}
                     </svg>
                   </div>
-                  <div className="flex justify-between text-xs font-bold text-slate-400 mt-3 pt-2 border-t border-slate-100 w-full text-left">
-                    {metrics.days.map((d) => (
-                      <span key={d} className="text-left">{d}</span>
+
+                  {/* 7-DAY INTERACTIVE METRICS BAR & LABELS */}
+                  <div className="grid grid-cols-7 gap-1 mt-3 pt-3 border-t border-slate-100 w-full text-center">
+                    {metrics.last7Days.map((d, idx) => (
+                      <div
+                        key={d.dateStr}
+                        className={"p-1.5 rounded-xl transition-all " + (
+                          idx === 6 ? "bg-indigo-50/70 border border-indigo-100" : "hover:bg-slate-50"
+                        )}
+                        title={d.fullDate + " : " + formatIDR(d.revenue) + " (" + d.orderCount + " struk)"}
+                      >
+                        <p className={"text-[11px] font-black leading-tight truncate " + (
+                          d.revenue > 0 ? "text-indigo-700" : "text-slate-400"
+                        )}>
+                          {d.revenue > 0 ? (d.revenue >= 1000000 ? (d.revenue / 1000000).toFixed(1) + "jt" : (d.revenue / 1000).toFixed(0) + "k") : "Rp 0"}
+                        </p>
+                        <p className={"text-[10px] font-extrabold mt-0.5 " + (
+                          idx === 6 ? "text-indigo-900" : "text-slate-600"
+                        )}>
+                          {d.dayName}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-medium">
+                          {d.shortDate}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 </div>
