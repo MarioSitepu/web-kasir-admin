@@ -161,9 +161,11 @@ export default function IndigoPOSDashboard() {
   const [reportProductFilter, setReportProductFilter] = useState<string>("all");
   const [reportMenuSortBy, setReportMenuSortBy] = useState<"qty_desc" | "rev_desc" | "qty_asc" | "name_asc">("qty_desc");
   const [reportMenuSearch, setReportMenuSearch] = useState<string>("");
+  const [reportSubTab, setReportSubTab] = useState<"menu" | "transactions" | "analytics">("menu");
+  const [reportPaymentFilter, setReportPaymentFilter] = useState<string>("all");
+  const [reportCategoryFilter, setReportCategoryFilter] = useState<string>("Semua");
 
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
@@ -403,21 +405,33 @@ export default function IndigoPOSDashboard() {
 
       // 2. Relative Date Filter
       if (reportDateFilter === "today") {
-        return (t.createdAt || 0) >= startOfToday;
+        if ((t.createdAt || 0) < startOfToday) return false;
       } else if (reportDateFilter === "7days") {
-        return (t.createdAt || 0) >= startOfToday - 7 * 24 * 60 * 60 * 1000;
+        if ((t.createdAt || 0) < startOfToday - 7 * 24 * 60 * 60 * 1000) return false;
       } else if (reportDateFilter === "30days") {
-        return (t.createdAt || 0) >= startOfToday - 30 * 24 * 60 * 60 * 1000;
+        if ((t.createdAt || 0) < startOfToday - 30 * 24 * 60 * 60 * 1000) return false;
+      }
+
+      // 3. Product / Menu Filter
+      if (reportProductFilter !== "all") {
+        const hasMatch = (t.items || []).some((item) =>
+          item.name.toLowerCase().includes(reportProductFilter.toLowerCase())
+        );
+        if (!hasMatch) return false;
+      }
+
+      // 4. Payment Method Filter
+      if (reportPaymentFilter !== "all") {
+        if (t.paymentMethod !== reportPaymentFilter) return false;
       }
 
       return true;
     });
-  }, [transactions, selectedMonth, reportDateFilter, reportProductFilter]);
+  }, [transactions, selectedMonth, reportDateFilter, reportProductFilter, reportPaymentFilter]);
 
   // Aggregated Menu Sales Breakdown & Sorting
   const menuSalesBreakdown = useMemo(() => {
     const map: { [name: string]: { name: string; category: string; price: number; qty: number; revenue: number; txCount: number } } = {};
-    
     let totalRevenueSum = 0;
 
     filteredTransactions.forEach((t) => {
@@ -445,6 +459,11 @@ export default function IndigoPOSDashboard() {
 
     let list = Object.values(map);
 
+    // Filter by Category
+    if (reportCategoryFilter !== "Semua") {
+      list = list.filter((m) => m.category.toLowerCase() === reportCategoryFilter.toLowerCase());
+    }
+
     // Menu search filter
     if (reportMenuSearch.trim()) {
       const q = reportMenuSearch.toLowerCase();
@@ -467,9 +486,8 @@ export default function IndigoPOSDashboard() {
       totalRevenueSum,
       totalItemsSold: list.reduce((acc, curr) => acc + curr.qty, 0),
     };
-  }, [filteredTransactions, products, reportMenuSearch, reportMenuSortBy]);
+  }, [filteredTransactions, products, reportMenuSearch, reportMenuSortBy, reportCategoryFilter]);
 
-  // Storage and Revenue Metrics
   const metrics = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -1553,450 +1571,594 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
 
-        {/* ================= SCREEN 4: LAPORAN KEUANGAN & STORAGE ================= */}
+        {/* ================= SCREEN 4: LAPORAN KEUANGAN & PERFORMA ================= */}
         {activeTab === "reports" && (
           <div className="space-y-6 w-full text-left">
-            {/* 1. DATABASE STORAGE USAGE CARD (FIGMA CLEAN HIGH-CONTRAST) */}
-            <div className="figma-card p-6 border border-slate-200 shadow-sm rounded-2xl bg-white text-slate-800">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                <div className="space-y-1.5 text-left">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
-                      <Database className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-extrabold text-base text-slate-900 leading-none">Status Penyimpanan Database</h3>
-                        
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Memantau ukuran data produk, transaksi kasir, dan riwayat mutasi stok realtime.
-                      </p>
-                    </div>
-                  </div>
+            {/* 1. HEADER & GLOBAL PERIOD CONTROLS */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4 text-left">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-black text-lg text-slate-900 text-left">Laporan Keuangan & Penjualan</h3>
+                  <p className="text-xs text-slate-500 text-left mt-0.5">
+                    {selectedMonth !== "all" ? "Data periode " + selectedMonth : "Menampilkan ringkasan seluruh transaksi kasir"}
+                  </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-xl text-left">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kapasitas Terpakai</p>
-                    <p className="text-sm font-extrabold text-slate-900">
-                      {metrics.totalKB} KB <span className="text-xs text-slate-500 font-semibold">({metrics.totalMB} MB)</span>
-                    </p>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Quick Period Pills */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1 text-xs font-bold">
+                    <button
+                      onClick={() => setReportDateFilter("all")}
+                      className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer " + (
+                        reportDateFilter === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Semua
+                    </button>
+                    <button
+                      onClick={() => setReportDateFilter("today")}
+                      className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer " + (
+                        reportDateFilter === "today" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Hari Ini
+                    </button>
+                    <button
+                      onClick={() => setReportDateFilter("7days")}
+                      className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer " + (
+                        reportDateFilter === "7days" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      7 Hari
+                    </button>
+                    <button
+                      onClick={() => setReportDateFilter("30days")}
+                      className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer " + (
+                        reportDateFilter === "30days" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      30 Hari
+                    </button>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-xl text-left">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Batas Kuota Gratis</p>
-                    <p className="text-sm font-extrabold text-slate-900">
-                      1.000 MB <span className="text-xs text-slate-500 font-semibold">(1 GB)</span>
-                    </p>
+
+                  {/* Month Selector */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">Semua Bulan</option>
+                      {availableMonths.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* Export CSV Button */}
                   <button
-                    onClick={() => {
-                      setDeleteScope("month");
-                      setMonthToDelete(availableMonths[0]?.key || "");
-                      setIsConfirmedCheckbox(false);
-                      setIsDeleteMonthModalOpen(true);
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs shadow-xs transition-all flex items-center gap-1.5"
+                    onClick={handleExportCSV}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Hapus Data Per Bulan</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh CSV</span>
                   </button>
                 </div>
               </div>
-
-              {/* Progress bar storage */}
-              <div className="mt-5 pt-4 border-t border-slate-100">
-                <div className="flex justify-between items-center text-xs font-semibold mb-2">
-                  <span className="text-slate-600 font-medium">Penggunaan Storage: <strong className="text-slate-900">{metrics.storageUsagePercent}%</strong></span>
-                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Tersisa 99.98% (Sangat Luang)</span>
-                </div>
-                <div className="w-full h-2.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-600 rounded-full transition-all duration-500"
-                    style={{ width: metrics.storageUsagePercent + "%", minWidth: "12px" }}
-                  />
-                </div>
-              </div>
             </div>
 
-            {/* 2. TOOLBAR FILTER & SORTIR MENU FINANSIAL */}
-            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 space-y-4 text-left w-full">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 text-left flex items-center gap-2">
-                    <span>Laporan & Analisis Penjualan Menu</span>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
-                      {menuSalesBreakdown.list.length} Variasi Menu
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-500 text-left mt-0.5">
-                    Sortir menu terlaris, pantau kontribusi omzet per produk, dan saring transaksi kasir.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleExportCSV}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 shrink-0 self-start md:self-auto cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Unduh Laporan CSV</span>
-                </button>
-              </div>
-
-              {/* FILTER CONTROLS GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                {/* A. SORTIR MENU */}
-                <div className="space-y-1 text-left">
-                  <label className="block font-bold text-slate-700 text-[11px]">Urutkan / Sortir Menu:</label>
-                  <select
-                    value={reportMenuSortBy}
-                    onChange={(e) => setReportMenuSortBy(e.target.value as any)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-indigo-700 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                  >
-                    <option value="qty_desc">Porsi Terbanyak (Paling Laris)</option>
-                    <option value="rev_desc">Omzet Tertinggi (Pendapatan)</option>
-                    <option value="qty_asc">Porsi Terendah (Kurang Laku)</option>
-                    <option value="name_asc">Nama Menu (A - Z)</option>
-                  </select>
-                </div>
-
-                {/* B. FILTER PILIH MENU TERTENTU */}
-                <div className="space-y-1 text-left">
-                  <label className="block font-bold text-slate-700 text-[11px]">Filter Menu Spesifik:</label>
-                  <select
-                    value={reportProductFilter}
-                    onChange={(e) => setReportProductFilter(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">Semua Menu (All Products)</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        [{p.category}] {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* C. FILTER BULAN */}
-                <div className="space-y-1 text-left">
-                  <label className="block font-bold text-slate-700 text-[11px]">Periode Bulan:</label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">Semua Bulan (All Time)</option>
-                    {availableMonths.map((m) => (
-                      <option key={m.key} value={m.key}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* D. FILTER RENTANG HARI */}
-                <div className="space-y-1 text-left">
-                  <label className="block font-bold text-slate-700 text-[11px]">Rentang Waktu:</label>
-                  <select
-                    value={reportDateFilter}
-                    onChange={(e) => setReportDateFilter(e.target.value as any)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">Semua Tanggal</option>
-                    <option value="today">Hari Ini Saja</option>
-                    <option value="7days">7 Hari Terakhir</option>
-                    <option value="30days">30 Hari Terakhir</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* SEARCH INPUT BAR */}
-              <div className="relative pt-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-                <input
-                  type="text"
-                  value={reportMenuSearch}
-                  onChange={(e) => setReportMenuSearch(e.target.value)}
-                  placeholder="Cari nama menu pada laporan (contoh: Ayam Geprek, Es Teh)..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            {/* 3. TABEL REKAPITULASI PENJUALAN PER MENU (SORTIR MENU) */}
-            <div className="figma-card overflow-hidden w-full text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900 text-left flex items-center gap-2">
-                    <UtensilsCrossed className="w-4 h-4 text-indigo-600" />
-                    <span>Tabel Rekapitulasi & Urutan Penjualan Per Menu</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 text-left">
-                    Diurutkan berdasarkan: <strong className="text-indigo-600">
-                      {reportMenuSortBy === "qty_desc" && "Porsi Terbanyak (Paling Laris)"}
-                      {reportMenuSortBy === "rev_desc" && "Omzet / Pendapatan Tertinggi"}
-                      {reportMenuSortBy === "qty_asc" && "Porsi Terendah"}
-                      {reportMenuSortBy === "name_asc" && "Nama Menu (A - Z)"}
-                    </strong>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-bold text-slate-600">Total Terjual:</span>
-                  <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                    {menuSalesBreakdown.totalItemsSold} Porsi
+            {/* 2. TOP 4 FINANCIAL KPI CARDS (BENTO STYLE) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full text-left">
+              {/* CARD 1: OMZET */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Omzet</span>
+                  <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 text-emerald-600" />
+                    <span>Pendapatan</span>
                   </span>
                 </div>
+                <div className="text-2xl font-black text-slate-900 tracking-tight mt-3">
+                  {formatIDR(metrics.totalRev)}
+                </div>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Periode terpilih</p>
               </div>
 
-              <div className="overflow-x-auto w-full text-left">
-                <table className="w-full text-left text-sm text-slate-600 border-collapse">
-                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
-                    <tr>
-                      <th className="py-3 px-4 text-left w-16">Peringkat</th>
-                      <th className="py-3 px-4 text-left">Nama Menu</th>
-                      <th className="py-3 px-4 text-left">Kategori</th>
-                      <th className="py-3 px-4 text-left">Harga Satuan</th>
-                      <th className="py-3 px-4 text-left">Porsi Terjual</th>
-                      <th className="py-3 px-4 text-left">Total Omzet</th>
-                      <th className="py-3 px-4 text-left">Kontribusi Omzet</th>
-                      <th className="py-3 px-4 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
-                    {menuSalesBreakdown.list.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-10 px-4 text-slate-400">
-                          Tidak ada data penjualan menu pada filter yang dipilih.
-                        </td>
-                      </tr>
-                    ) : (
-                      menuSalesBreakdown.list.map((m, idx) => {
-                        const contributionPct = menuSalesBreakdown.totalRevenueSum > 0
-                          ? Math.round((m.revenue / menuSalesBreakdown.totalRevenueSum) * 100)
-                          : 0;
+              {/* CARD 2: TOTAL TRANSAKSI */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Struk Kasir</span>
+                  <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                    <span>Selesai</span>
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-slate-900 tracking-tight mt-3">
+                  {filteredTransactions.length} <span className="text-sm font-bold text-slate-500">Struk</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1 font-medium">
+                  Rata-rata {formatIDR(filteredTransactions.length > 0 ? Math.round(metrics.totalRev / filteredTransactions.length) : 0)} / order
+                </p>
+              </div>
 
-                        return (
-                          <tr key={m.name + "_" + idx} className="hover:bg-slate-50/70 transition-colors text-left">
-                            <td className="py-3.5 px-4 text-left">
-                              {idx === 0 ? (
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
-                                  1
-                                </span>
-                              ) : idx === 1 ? (
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-black text-xs border border-slate-300">
-                                  2
-                                </span>
-                              ) : idx === 2 ? (
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-700 font-black text-xs border border-amber-200">
-                                  3
-                                </span>
-                              ) : (
-                                <span className="font-bold text-slate-400 pl-2">#{idx + 1}</span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 font-extrabold text-slate-900 text-left">
-                              {m.name}
-                            </td>
-                            <td className="py-3.5 px-4 text-left">
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                {m.category}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-semibold text-slate-700 text-left">
-                              {formatIDR(m.price)}
-                            </td>
-                            <td className="py-3.5 px-4 text-left">
-                              <span className="font-black text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                {m.qty} Porsi
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-black text-slate-900 text-left">
-                              {formatIDR(m.revenue)}
-                            </td>
-                            <td className="py-3.5 px-4 text-left">
-                              <div className="w-32 space-y-1">
-                                <div className="flex justify-between text-[10px] font-bold">
-                                  <span className="text-slate-500">{contributionPct}%</span>
-                                </div>
-                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-indigo-600 rounded-full"
-                                    style={{ width: contributionPct + "%", minWidth: m.qty > 0 ? "4px" : "0px" }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <button
-                                onClick={() => setReportProductFilter(m.name)}
-                                className={"px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer " + (
-                                  reportProductFilter === m.name
-                                    ? "bg-indigo-600 text-white border-indigo-600"
-                                    : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
-                                )}
-                                title="Saring Riwayat Transaksi untuk Menu Ini"
-                              >
-                                {reportProductFilter === m.name ? "? Terfilter" : "Filter Struk"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+              {/* CARD 3: TOTAL PORSI TERJUAL */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Menu Terjual</span>
+                  <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>Porsi</span>
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-slate-900 tracking-tight mt-3">
+                  {menuSalesBreakdown.totalItemsSold} <span className="text-sm font-bold text-slate-500">Porsi</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1 font-medium">
+                  Dari {menuSalesBreakdown.list.length} jenis variasi menu
+                </p>
+              </div>
+
+              {/* CARD 4: METODE BAYAR */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dominasi Pembayaran</span>
+                  <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                    {metrics.qrisPct >= metrics.cashPct ? "QRIS" : "Tunai"}
+                  </span>
+                </div>
+                <div className="text-xl font-black text-slate-900 tracking-tight mt-3">
+                  QRIS {metrics.qrisPct}% <span className="text-slate-300 font-normal">|</span> Tunai {metrics.cashPct}%
+                </div>
+                <p className="text-xs text-slate-400 mt-1 font-medium">
+                  Transfer Bank {metrics.transferPct}%
+                </p>
               </div>
             </div>
 
-            {/* 4. CHARTS & TRANSACTION HISTORY */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
-              <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <div className="text-left">
-                  <h3 className="font-extrabold text-base text-slate-900 text-left">Metode Pembayaran</h3>
-                  <p className="text-xs text-slate-400 text-left">Porsi dari omzet periode terpilih</p>
+            {/* 3. SUB-TAB VIEW NAVIGATION (TERFOKUS & RAPI) */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto text-xs font-extrabold">
+              <button
+                onClick={() => setReportSubTab("menu")}
+                className={"px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap " + (
+                  reportSubTab === "menu"
+                    ? "bg-indigo-600 text-white shadow-xs shadow-indigo-200"
+                    : "text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                <span>Rekap Penjualan Menu</span>
+                <span className={"px-1.5 py-0.2 rounded-full text-[10px] " + (
+                  reportSubTab === "menu" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                )}>
+                  {menuSalesBreakdown.list.length}
+                </span>
+              </button>
 
-                  <div className="py-6 flex flex-col items-center justify-center">
-                    <div className="relative w-44 h-44 flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="14" />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          fill="none"
-                          stroke="#4F46E5"
-                          strokeWidth="14"
-                          strokeDasharray="238"
-                          strokeDashoffset={238 - (238 * metrics.qrisPct) / 100}
-                          strokeLinecap="round"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          fill="none"
-                          stroke="#10B981"
-                          strokeWidth="14"
-                          strokeDasharray="238"
-                          strokeDashoffset={238 - (238 * metrics.cashPct) / 100}
-                          strokeLinecap="round"
-                          className="opacity-90"
-                        />
-                      </svg>
-                      <div className="absolute text-center">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Omzet</span>
-                        <span className="text-sm font-black text-slate-900 leading-tight">
-                          {formatIDR(metrics.totalRev)}
-                        </span>
-                      </div>
-                    </div>
+              <button
+                onClick={() => setReportSubTab("transactions")}
+                className={"px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap " + (
+                  reportSubTab === "transactions"
+                    ? "bg-indigo-600 text-white shadow-xs shadow-indigo-200"
+                    : "text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Riwayat Struk Kasir</span>
+                <span className={"px-1.5 py-0.2 rounded-full text-[10px] " + (
+                  reportSubTab === "transactions" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                )}>
+                  {filteredTransactions.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setReportSubTab("analytics")}
+                className={"px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap " + (
+                  reportSubTab === "analytics"
+                    ? "bg-indigo-600 text-white shadow-xs shadow-indigo-200"
+                    : "text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Metode Bayar & Kuota Storage</span>
+              </button>
+            </div>
+
+            {/* ================= VIEW 1: REKAP PENJUALAN MENU ================= */}
+            {reportSubTab === "menu" && (
+              <div className="space-y-4 w-full text-left">
+                {/* TOOLBAR FILTER & SORTIR MENU */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+                  {/* Search Menu Input */}
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={reportMenuSearch}
+                      onChange={(e) => setReportMenuSearch(e.target.value)}
+                      placeholder="Cari nama menu (contoh: Ayam Geprek, Es Teh)..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                    />
                   </div>
 
-                  <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs text-left">
-                    <div className="flex items-center justify-between text-left">
-                      <div className="flex items-center justify-start gap-2 text-left">
-                        <span className="w-3 h-3 rounded-full bg-indigo-600 shrink-0" />
-                        <span className="font-bold text-slate-700 text-left">QRIS Dinamis</span>
-                      </div>
-                      <span className="font-extrabold text-slate-900">{metrics.qrisPct}%</span>
-                    </div>
+                  {/* Kategori Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 font-bold">
+                    {["Semua", "Makanan", "Minuman", "Snack"].map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setReportCategoryFilter(cat)}
+                        className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap " + (
+                          reportCategoryFilter === cat
+                            ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
 
-                    <div className="flex items-center justify-between text-left">
-                      <div className="flex items-center justify-start gap-2 text-left">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
-                        <span className="font-bold text-slate-700 text-left">Tunai (Cash)</span>
-                      </div>
-                      <span className="font-extrabold text-slate-900">{metrics.cashPct}%</span>
-                    </div>
+                  {/* Dropdown Sortir Menu */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-slate-500">Urutkan:</span>
+                    <select
+                      value={reportMenuSortBy}
+                      onChange={(e) => setReportMenuSortBy(e.target.value as any)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-extrabold text-indigo-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="qty_desc">Porsi Terbanyak (Paling Laris)</option>
+                      <option value="rev_desc">Omzet Tertinggi (Pendapatan)</option>
+                      <option value="qty_asc">Porsi Terendah (Kurang Laku)</option>
+                      <option value="name_asc">Nama Menu (A - Z)</option>
+                    </select>
+                  </div>
+                </div>
 
-                    <div className="flex items-center justify-between text-left">
-                      <div className="flex items-center justify-start gap-2 text-left">
-                        <span className="w-3 h-3 rounded-full bg-slate-300 shrink-0" />
-                        <span className="font-bold text-slate-700 text-left">Transfer Bank</span>
-                      </div>
-                      <span className="font-extrabold text-slate-900">{metrics.transferPct}%</span>
-                    </div>
+                {/* TABEL RANKING & KONTRIBUSI MENU */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden w-full text-left">
+                  <div className="overflow-x-auto w-full text-left">
+                    <table className="w-full text-left text-sm text-slate-600 border-collapse">
+                      <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
+                        <tr>
+                          <th className="py-3 px-4 text-left w-16">Peringkat</th>
+                          <th className="py-3 px-4 text-left">Nama Menu</th>
+                          <th className="py-3 px-4 text-left">Kategori</th>
+                          <th className="py-3 px-4 text-left">Harga Satuan</th>
+                          <th className="py-3 px-4 text-left">Porsi Terjual</th>
+                          <th className="py-3 px-4 text-left">Total Pendapatan</th>
+                          <th className="py-3 px-4 text-left">Kontribusi Omzet</th>
+                          <th className="py-3 px-4 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
+                        {menuSalesBreakdown.list.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="text-center py-10 px-4 text-slate-400">
+                              Tidak ada menu yang sesuai dengan filter pencarian.
+                            </td>
+                          </tr>
+                        ) : (
+                          menuSalesBreakdown.list.map((m, idx) => {
+                            const contributionPct = menuSalesBreakdown.totalRevenueSum > 0
+                              ? Math.round((m.revenue / menuSalesBreakdown.totalRevenueSum) * 100)
+                              : 0;
+
+                            return (
+                              <tr key={m.name + "_" + idx} className="hover:bg-slate-50/80 transition-colors text-left">
+                                <td className="py-3.5 px-4 text-left">
+                                  {idx === 0 ? (
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
+                                      1
+                                    </span>
+                                  ) : idx === 1 ? (
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-black text-xs border border-slate-300">
+                                      2
+                                    </span>
+                                  ) : idx === 2 ? (
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-700 font-black text-xs border border-amber-200">
+                                      3
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-slate-400 pl-2">#{idx + 1}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-extrabold text-slate-900 text-left">
+                                  {m.name}
+                                </td>
+                                <td className="py-3.5 px-4 text-left">
+                                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                    {m.category}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-slate-700 text-left">
+                                  {formatIDR(m.price)}
+                                </td>
+                                <td className="py-3.5 px-4 text-left">
+                                  <span className="font-black text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    {m.qty} Porsi
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 font-black text-slate-900 text-left">
+                                  {formatIDR(m.revenue)}
+                                </td>
+                                <td className="py-3.5 px-4 text-left">
+                                  <div className="w-32 space-y-1">
+                                    <div className="flex justify-between text-[10px] font-bold">
+                                      <span className="text-slate-500">{contributionPct}%</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-indigo-600 rounded-full"
+                                        style={{ width: contributionPct + "%", minWidth: m.qty > 0 ? "4px" : "0px" }}
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <button
+                                    onClick={() => {
+                                      setReportProductFilter(m.name);
+                                      setReportSubTab("transactions");
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-all cursor-pointer"
+                                    title="Lihat Semua Struk Transaksi Menu Ini"
+                                  >
+                                    Lihat Struk &rarr;
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="lg:col-span-8 figma-card p-6 text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 text-left">
-                  <div>
-                    <h3 className="font-extrabold text-base text-slate-900 text-left">Riwayat Transaksi Struk</h3>
-                    {reportProductFilter !== "all" && (
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                          Menyaring: {reportProductFilter}
-                        </span>
+            {/* ================= VIEW 2: RIWAYAT STRUK KASIR ================= */}
+            {reportSubTab === "transactions" && (
+              <div className="space-y-4 w-full text-left">
+                {/* TRANSACTION CONTROLS */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+                  {/* Specific Menu Filter Status */}
+                  <div className="flex items-center gap-2">
+                    {reportProductFilter !== "all" ? (
+                      <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-xl">
+                        <span className="font-bold text-indigo-700">Filter Menu: <strong>{reportProductFilter}</strong></span>
                         <button
                           onClick={() => setReportProductFilter("all")}
-                          className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
+                          className="text-rose-600 hover:text-rose-800 font-bold ml-1 cursor-pointer"
                         >
-                          Reset Filter
+                          ✕ Reset
                         </button>
                       </div>
+                    ) : (
+                      <span className="font-bold text-slate-600">Menampilkan Seluruh Menu</span>
                     )}
                   </div>
-                  <span className="text-xs text-slate-400 text-left">{filteredTransactions.length} Total Transaksi</span>
+
+                  {/* Payment Filter Pills */}
+                  <div className="flex items-center gap-1 font-bold">
+                    <span className="text-slate-500 mr-1">Metode:</span>
+                    {["all", "CASH", "QRIS", "TRANSFER"].map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setReportPaymentFilter(method)}
+                        className={"px-3 py-1.5 rounded-lg transition-all cursor-pointer " + (
+                          reportPaymentFilter === method
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                        )}
+                      >
+                        {method === "all" ? "Semua" : method === "CASH" ? "Tunai" : method}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto w-full text-left">
-                  <table className="w-full text-left text-sm text-slate-600 border-collapse">
-                    <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
-                      <tr>
-                        <th className="py-3 px-4 text-left">Tanggal & Jam</th>
-                        <th className="py-3 px-4 text-left">No. Invoice</th>
-                        <th className="py-3 px-4 text-left">Item Pesanan</th>
-                        <th className="py-3 px-4 text-left">Pembayaran</th>
-                        <th className="py-3 px-4 text-left">Total Bayar</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
-                      {filteredTransactions.length === 0 ? (
+                {/* TABLE OF TRANSACTIONS */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden w-full text-left">
+                  <div className="overflow-x-auto w-full text-left">
+                    <table className="w-full text-left text-sm text-slate-600 border-collapse">
+                      <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
                         <tr>
-                          <td colSpan={5} className="text-center py-10 px-4 text-slate-400">
-                            Tidak ada data transaksi pada filter yang dipilih.
-                          </td>
+                          <th className="py-3 px-4 text-left">Tanggal & Jam</th>
+                          <th className="py-3 px-4 text-left">No. Invoice</th>
+                          <th className="py-3 px-4 text-left">Item Pesanan</th>
+                          <th className="py-3 px-4 text-left">Metode Bayar</th>
+                          <th className="py-3 px-4 text-left">Total Bayar</th>
                         </tr>
-                      ) : (
-                        filteredTransactions.map((tx) => (
-                          <tr
-                            key={tx.id}
-                            onClick={() => setSelectedTxDetail(tx)}
-                            className="hover:bg-slate-50/60 cursor-pointer transition-colors text-left"
-                          >
-                            <td className="py-3 px-4 text-slate-500 text-left">{formatDate(tx.createdAt)}</td>
-                            <td className="py-3 px-4 font-mono font-bold text-slate-800 text-left">
-                              #{tx.invoiceNumber || tx.id}
-                            </td>
-                            <td className="py-3 px-4 text-slate-800 text-left font-medium">
-                              {(tx.items || []).map((i) => i.name + " (" + i.qty + "x)").join(", ")}
-                            </td>
-                            <td className="py-3 px-4 text-left">
-                              <span
-                                className={"text-[11px] font-extrabold px-2 py-0.5 rounded-full " + (
-                                  tx.paymentMethod === "QRIS"
-                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
-                                    : tx.paymentMethod === "TRANSFER"
-                                    ? "bg-purple-50 text-purple-700 border border-purple-100"
-                                    : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                )}
-                              >
-                                {tx.paymentMethod}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 font-black text-slate-900 text-left">
-                              {formatIDR(tx.grandTotal)}
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
+                        {filteredTransactions.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="text-center py-10 px-4 text-slate-400">
+                              Tidak ada transaksi yang cocok dengan filter yang dipilih.
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          filteredTransactions.map((tx) => (
+                            <tr
+                              key={tx.id}
+                              onClick={() => setSelectedTxDetail(tx)}
+                              className="hover:bg-slate-50/80 cursor-pointer transition-colors text-left"
+                            >
+                              <td className="py-3.5 px-4 text-slate-500 text-left">{formatDate(tx.createdAt)}</td>
+                              <td className="py-3.5 px-4 font-mono font-bold text-slate-800 text-left">
+                                #{tx.invoiceNumber || tx.id}
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-800 text-left font-semibold">
+                                {(tx.items || []).map((i) => i.name + " (" + i.qty + "x)").join(", ")}
+                              </td>
+                              <td className="py-3.5 px-4 text-left">
+                                <span
+                                  className={"text-[11px] font-extrabold px-2 py-0.5 rounded-full " + (
+                                    tx.paymentMethod === "QRIS"
+                                      ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                                      : tx.paymentMethod === "TRANSFER"
+                                      ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                      : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                  )}
+                                >
+                                  {tx.paymentMethod}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 font-black text-slate-900 text-left">
+                                {formatIDR(tx.grandTotal)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* ================= VIEW 3: METODE BAYAR & DATABASE STORAGE ================= */}
+            {reportSubTab === "analytics" && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
+                {/* DONUT CHART METODE BAYAR */}
+                <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between text-left">
+                  <div>
+                    <h3 className="font-black text-base text-slate-900 text-left">Proporsi Metode Pembayaran</h3>
+                    <p className="text-xs text-slate-400 text-left mt-0.5">Persentase omzet dari seluruh metode bayar</p>
+
+                    <div className="py-6 flex flex-col items-center justify-center">
+                      <div className="relative w-44 h-44 flex items-center justify-center">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" strokeWidth="14" />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            fill="none"
+                            stroke="#4F46E5"
+                            strokeWidth="14"
+                            strokeDasharray="238"
+                            strokeDashoffset={238 - (238 * metrics.qrisPct) / 100}
+                            strokeLinecap="round"
+                          />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            fill="none"
+                            stroke="#10B981"
+                            strokeWidth="14"
+                            strokeDasharray="238"
+                            strokeDashoffset={238 - (238 * metrics.cashPct) / 100}
+                            strokeLinecap="round"
+                            className="opacity-90"
+                          />
+                        </svg>
+                        <div className="absolute text-center">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Omzet</span>
+                          <span className="text-sm font-black text-slate-900 leading-tight">
+                            {formatIDR(metrics.totalRev)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs text-left">
+                      <div className="flex items-center justify-between text-left">
+                        <div className="flex items-center justify-start gap-2 text-left">
+                          <span className="w-3 h-3 rounded-full bg-indigo-600 shrink-0" />
+                          <span className="font-bold text-slate-700 text-left">QRIS Dinamis</span>
+                        </div>
+                        <span className="font-extrabold text-slate-900">{metrics.qrisPct}%</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-left">
+                        <div className="flex items-center justify-start gap-2 text-left">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                          <span className="font-bold text-slate-700 text-left">Tunai (Cash)</span>
+                        </div>
+                        <span className="font-extrabold text-slate-900">{metrics.cashPct}%</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-left">
+                        <div className="flex items-center justify-start gap-2 text-left">
+                          <span className="w-3 h-3 rounded-full bg-slate-300 shrink-0" />
+                          <span className="font-bold text-slate-700 text-left">Transfer Bank</span>
+                        </div>
+                        <span className="font-extrabold text-slate-900">{metrics.transferPct}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DATABASE STORAGE USAGE */}
+                <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between text-left">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-base text-slate-900">Kapasitas Penyimpanan Cloud Database</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Firebase Realtime Database untuk sinkronisasi POS tablet dan admin web
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div className="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kapasitas Terpakai</p>
+                        <p className="text-base font-black text-slate-900 mt-1">
+                          {metrics.totalKB} KB <span className="text-xs text-slate-500 font-semibold">({metrics.totalMB} MB)</span>
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Batas Kuota Gratis</p>
+                        <p className="text-base font-black text-slate-900 mt-1">
+                          1.000 MB <span className="text-xs text-slate-500 font-semibold">(1 GB)</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <div className="flex justify-between items-center text-xs font-semibold mb-2">
+                        <span className="text-slate-600">Penggunaan: <strong className="text-slate-900">{metrics.storageUsagePercent}%</strong></span>
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                          Sangat Luang (99.9% Bebas)
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                          style={{ width: metrics.storageUsagePercent + "%", minWidth: "12px" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                    <p className="text-xs text-slate-500">Pembersihan data riwayat lama secara berkala:</p>
+                    <button
+                      onClick={() => {
+                        setDeleteScope("month");
+                        setMonthToDelete(availableMonths[0]?.key || "");
+                        setIsConfirmedCheckbox(false);
+                        setIsDeleteMonthModalOpen(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Hapus Data Per Bulan</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
