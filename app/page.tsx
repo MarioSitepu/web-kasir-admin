@@ -1864,11 +1864,6 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
               >
                 <UtensilsCrossed className="w-3.5 h-3.5" />
                 <span>Rekap Penjualan Menu</span>
-                <span className={"px-1.5 py-0.2 rounded-full text-[10px] " + (
-                  reportSubTab === "menu" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
-                )}>
-                  {menuSalesBreakdown.list.length}
-                </span>
               </button>
 
               <button
@@ -1881,11 +1876,6 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
               >
                 <Store className="w-3.5 h-3.5" />
                 <span>Riwayat Struk Kasir</span>
-                <span className={"px-1.5 py-0.2 rounded-full text-[10px] " + (
-                  reportSubTab === "transactions" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
-                )}>
-                  {filteredTransactions.length}
-                </span>
               </button>
 
               <button
