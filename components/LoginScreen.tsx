@@ -166,22 +166,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             </button>
           </form>
 
-          {/* Quick Access Account Pill */}
-          <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-left">
-            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Akun Bawaan:</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-[11px] font-medium text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <span className="font-bold text-indigo-400">Admin:</span>
-              <code>admin / sapo123</code>
-            </button>
           </div>
-        </div>
 
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500">
