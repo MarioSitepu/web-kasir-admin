@@ -1653,10 +1653,10 @@ export default function IndigoPOSDashboard() {
                     onChange={(e) => setReportMenuSortBy(e.target.value as any)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-indigo-700 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
                   >
-                    <option value="qty_desc">?? Porsi Terbanyak (Paling Laris)</option>
-                    <option value="rev_desc">?? Omzet Tertinggi (Pendapatan)</option>
-                    <option value="qty_asc">?? Porsi Terendah (Kurang Laku)</option>
-                    <option value="name_asc">?? Nama Menu (A - Z)</option>
+                    <option value="qty_desc">Porsi Terbanyak (Paling Laris)</option>
+                    <option value="rev_desc">Omzet Tertinggi (Pendapatan)</option>
+                    <option value="qty_asc">Porsi Terendah (Kurang Laku)</option>
+                    <option value="name_asc">Nama Menu (A - Z)</option>
                   </select>
                 </div>
 
