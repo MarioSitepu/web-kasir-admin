@@ -2343,29 +2343,73 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
                 />
               </div>
 
-              {/* 2. KATEGORI & SKU */}
+              {/* 2. KATEGORI & SKU (MENDUKUNG TAMBAH KATEGORI BARU) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-                <div className="space-y-1 text-left">
-                  <label className="block font-bold text-slate-700 text-xs">Kategori Menu *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value, sku: generateSKU(e.target.value) })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  >
-                    <option value="Makanan">Makanan</option>
-                    <option value="Minuman">Minuman</option>
-                    <option value="Snack">Snack / Camilan</option>
-                    <option value="Paket Hemat">Paket Hemat</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
+                <div className="space-y-1.5 text-left">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-slate-700 text-xs">Kategori Menu *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(!isCustomCategory);
+                        if (!isCustomCategory) {
+                          setCustomCategoryInput("");
+                        }
+                      }}
+                      className="text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    >
+                      {isCustomCategory ? "← Pilih dari Daftar" : "+ Buat Kategori Baru"}
+                    </button>
+                  </div>
+
+                  {isCustomCategory ? (
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="Ketik kategori baru (contoh: Sambal, Topping, dll)..."
+                        value={customCategoryInput}
+                        onChange={(e) => {
+                          setCustomCategoryInput(e.target.value);
+                          setFormData({ ...formData, sku: generateSKU(e.target.value) });
+                        }}
+                        className="w-full bg-indigo-50/60 border border-indigo-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-xs focus:outline-none focus:border-indigo-600 placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                      <p className="text-[10px] text-indigo-600 font-bold">✓ Kategori baru akan otomatis tersimpan ke database & filter</p>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.category}
+                      onChange={(e) => {
+                        if (e.target.value === "__NEW_CUSTOM__") {
+                          setIsCustomCategory(true);
+                          setCustomCategoryInput("");
+                        } else {
+                          setFormData({ ...formData, category: e.target.value, sku: generateSKU(e.target.value) });
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      {categories.filter((c) => c.id !== "Semua").map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                      <option value="__NEW_CUSTOM__" className="text-indigo-600 font-extrabold">
+                        + Tambah Kategori Baru...
+                      </option>
+                    </select>
+                  )}
                 </div>
-                <div className="space-y-1 text-left">
+
+                <div className="space-y-1.5 text-left">
                   <label className="block font-bold text-slate-700 text-xs">Kode SKU (Auto)</label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-slate-700 font-bold text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-mono text-slate-700 font-bold text-xs focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
