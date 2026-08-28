@@ -158,6 +158,9 @@ export default function IndigoPOSDashboard() {
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [reportDateFilter, setReportDateFilter] = useState<"today" | "7days" | "30days" | "month" | "all">("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all"); // format YYYY-MM or 'all'
+  const [reportProductFilter, setReportProductFilter] = useState<string>("all");
+  const [reportMenuSortBy, setReportMenuSortBy] = useState<"qty_desc" | "rev_desc" | "qty_asc" | "name_asc">("qty_desc");
+  const [reportMenuSearch, setReportMenuSearch] = useState<string>("");
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -409,7 +412,62 @@ export default function IndigoPOSDashboard() {
 
       return true;
     });
-  }, [transactions, selectedMonth, reportDateFilter]);
+  }, [transactions, selectedMonth, reportDateFilter, reportProductFilter]);
+
+  // Aggregated Menu Sales Breakdown & Sorting
+  const menuSalesBreakdown = useMemo(() => {
+    const map: { [name: string]: { name: string; category: string; price: number; qty: number; revenue: number; txCount: number } } = {};
+    
+    let totalRevenueSum = 0;
+
+    filteredTransactions.forEach((t) => {
+      (t.items || []).forEach((item) => {
+        const name = (item.name && item.name !== "Item" && item.name !== "Unnamed Product") ? item.name : "Paket Ayam Geprek";
+        if (!map[name]) {
+          const prod = products.find((p) => p.name.toLowerCase() === name.toLowerCase());
+          map[name] = {
+            name,
+            category: prod?.category || "Makanan",
+            price: item.price || prod?.price || 15000,
+            qty: 0,
+            revenue: 0,
+            txCount: 0,
+          };
+        }
+        const qty = item.qty || 1;
+        const rev = (item.subtotal && item.subtotal > 0) ? item.subtotal : ((item.price || 0) * qty);
+        map[name].qty += qty;
+        map[name].revenue += rev > 0 ? rev : (t.grandTotal || 15000);
+        map[name].txCount += 1;
+        totalRevenueSum += rev > 0 ? rev : (t.grandTotal || 15000);
+      });
+    });
+
+    let list = Object.values(map);
+
+    // Menu search filter
+    if (reportMenuSearch.trim()) {
+      const q = reportMenuSearch.toLowerCase();
+      list = list.filter((m) => m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q));
+    }
+
+    // Sort by criteria
+    if (reportMenuSortBy === "qty_desc") {
+      list.sort((a, b) => b.qty - a.qty);
+    } else if (reportMenuSortBy === "rev_desc") {
+      list.sort((a, b) => b.revenue - a.revenue);
+    } else if (reportMenuSortBy === "qty_asc") {
+      list.sort((a, b) => a.qty - b.qty);
+    } else if (reportMenuSortBy === "name_asc") {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return {
+      list,
+      totalRevenueSum,
+      totalItemsSold: list.reduce((acc, curr) => acc + curr.qty, 0),
+    };
+  }, [filteredTransactions, products, reportMenuSearch, reportMenuSortBy]);
 
   // Storage and Revenue Metrics
   const metrics = useMemo(() => {
@@ -1561,24 +1619,71 @@ export default function IndigoPOSDashboard() {
               </div>
             </div>
 
-            {/* 2. TOOLBAR SORTIR BULANAN & RANGE TANGGAL */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full text-left">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900 text-left">Rincian Finansial & Riwayat Kasir</h3>
-                <p className="text-xs text-slate-500 text-left">
-                  {selectedMonth !== "all" ? "Menampilkan data bulan " + selectedMonth : "Menampilkan seluruh riwayat transaksi"}
-                </p>
+            {/* 2. TOOLBAR FILTER & SORTIR MENU FINANSIAL */}
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 space-y-4 text-left w-full">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 text-left flex items-center gap-2">
+                    <span>Laporan & Analisis Penjualan Menu</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
+                      {menuSalesBreakdown.list.length} Variasi Menu
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 text-left mt-0.5">
+                    Sortir menu terlaris, pantau kontribusi omzet per produk, dan saring transaksi kasir.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleExportCSV}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 shrink-0 self-start md:self-auto cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Laporan CSV</span>
+                </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Monthly Selector Dropdown */}
-                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-500">Bulan:</span>
+              {/* FILTER CONTROLS GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {/* A. SORTIR MENU */}
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-[11px]">Urutkan / Sortir Menu:</label>
+                  <select
+                    value={reportMenuSortBy}
+                    onChange={(e) => setReportMenuSortBy(e.target.value as any)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-indigo-700 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="qty_desc">?? Porsi Terbanyak (Paling Laris)</option>
+                    <option value="rev_desc">?? Omzet Tertinggi (Pendapatan)</option>
+                    <option value="qty_asc">?? Porsi Terendah (Kurang Laku)</option>
+                    <option value="name_asc">?? Nama Menu (A - Z)</option>
+                  </select>
+                </div>
+
+                {/* B. FILTER PILIH MENU TERTENTU */}
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-[11px]">Filter Menu Spesifik:</label>
+                  <select
+                    value={reportProductFilter}
+                    onChange={(e) => setReportProductFilter(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">Semua Menu (All Products)</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        [{p.category}] {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* C. FILTER BULAN */}
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-[11px]">Periode Bulan:</label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
                   >
                     <option value="all">Semua Bulan (All Time)</option>
                     {availableMonths.map((m) => (
@@ -1589,31 +1694,163 @@ export default function IndigoPOSDashboard() {
                   </select>
                 </div>
 
-                {/* Relative Filter */}
-                <select
-                  value={reportDateFilter}
-                  onChange={(e) => setReportDateFilter(e.target.value as any)}
-                  className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="all">Semua Tanggal</option>
-                  <option value="today">Hari Ini</option>
-                  <option value="7days">7 Hari Terakhir</option>
-                  <option value="30days">30 Hari Terakhir</option>
-                </select>
+                {/* D. FILTER RENTANG HARI */}
+                <div className="space-y-1 text-left">
+                  <label className="block font-bold text-slate-700 text-[11px]">Rentang Waktu:</label>
+                  <select
+                    value={reportDateFilter}
+                    onChange={(e) => setReportDateFilter(e.target.value as any)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">Semua Tanggal</option>
+                    <option value="today">Hari Ini Saja</option>
+                    <option value="7days">7 Hari Terakhir</option>
+                    <option value="30days">30 Hari Terakhir</option>
+                  </select>
+                </div>
+              </div>
 
-                <button
-                  onClick={handleExportCSV}
-                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-sm transition-all flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Unduh CSV</span>
-                </button>
+              {/* SEARCH INPUT BAR */}
+              <div className="relative pt-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                <input
+                  type="text"
+                  value={reportMenuSearch}
+                  onChange={(e) => setReportMenuSearch(e.target.value)}
+                  placeholder="Cari nama menu pada laporan (contoh: Ayam Geprek, Es Teh)..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
               </div>
             </div>
 
-            {/* 3. CHARTS & TRANSACTION HISTORY */}
+            {/* 3. TABEL REKAPITULASI PENJUALAN PER MENU (SORTIR MENU) */}
+            <div className="figma-card overflow-hidden w-full text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900 text-left flex items-center gap-2">
+                    <UtensilsCrossed className="w-4 h-4 text-indigo-600" />
+                    <span>Tabel Rekapitulasi & Urutan Penjualan Per Menu</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 text-left">
+                    Diurutkan berdasarkan: <strong className="text-indigo-600">
+                      {reportMenuSortBy === "qty_desc" && "Porsi Terbanyak (Paling Laris)"}
+                      {reportMenuSortBy === "rev_desc" && "Omzet / Pendapatan Tertinggi"}
+                      {reportMenuSortBy === "qty_asc" && "Porsi Terendah"}
+                      {reportMenuSortBy === "name_asc" && "Nama Menu (A - Z)"}
+                    </strong>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-bold text-slate-600">Total Terjual:</span>
+                  <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                    {menuSalesBreakdown.totalItemsSold} Porsi
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto w-full text-left">
+                <table className="w-full text-left text-sm text-slate-600 border-collapse">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider text-left">
+                    <tr>
+                      <th className="py-3 px-4 text-left w-16">Peringkat</th>
+                      <th className="py-3 px-4 text-left">Nama Menu</th>
+                      <th className="py-3 px-4 text-left">Kategori</th>
+                      <th className="py-3 px-4 text-left">Harga Satuan</th>
+                      <th className="py-3 px-4 text-left">Porsi Terjual</th>
+                      <th className="py-3 px-4 text-left">Total Omzet</th>
+                      <th className="py-3 px-4 text-left">Kontribusi Omzet</th>
+                      <th className="py-3 px-4 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
+                    {menuSalesBreakdown.list.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-10 px-4 text-slate-400">
+                          Tidak ada data penjualan menu pada filter yang dipilih.
+                        </td>
+                      </tr>
+                    ) : (
+                      menuSalesBreakdown.list.map((m, idx) => {
+                        const contributionPct = menuSalesBreakdown.totalRevenueSum > 0
+                          ? Math.round((m.revenue / menuSalesBreakdown.totalRevenueSum) * 100)
+                          : 0;
+
+                        return (
+                          <tr key={m.name + "_" + idx} className="hover:bg-slate-50/70 transition-colors text-left">
+                            <td className="py-3.5 px-4 text-left">
+                              {idx === 0 ? (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
+                                  1
+                                </span>
+                              ) : idx === 1 ? (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-black text-xs border border-slate-300">
+                                  2
+                                </span>
+                              ) : idx === 2 ? (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-700 font-black text-xs border border-amber-200">
+                                  3
+                                </span>
+                              ) : (
+                                <span className="font-bold text-slate-400 pl-2">#{idx + 1}</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 font-extrabold text-slate-900 text-left">
+                              {m.name}
+                            </td>
+                            <td className="py-3.5 px-4 text-left">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                {m.category}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-700 text-left">
+                              {formatIDR(m.price)}
+                            </td>
+                            <td className="py-3.5 px-4 text-left">
+                              <span className="font-black text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                {m.qty} Porsi
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-black text-slate-900 text-left">
+                              {formatIDR(m.revenue)}
+                            </td>
+                            <td className="py-3.5 px-4 text-left">
+                              <div className="w-32 space-y-1">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-slate-500">{contributionPct}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-indigo-600 rounded-full"
+                                    style={{ width: contributionPct + "%", minWidth: m.qty > 0 ? "4px" : "0px" }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                onClick={() => setReportProductFilter(m.name)}
+                                className={"px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer " + (
+                                  reportProductFilter === m.name
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
+                                )}
+                                title="Saring Riwayat Transaksi untuk Menu Ini"
+                              >
+                                {reportProductFilter === m.name ? "? Terfilter" : "Filter Struk"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4. CHARTS & TRANSACTION HISTORY */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full text-left">
-              <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between text-left">
+              <div className="lg:col-span-4 figma-card p-6 flex flex-col justify-between text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
                 <div className="text-left">
                   <h3 className="font-extrabold text-base text-slate-900 text-left">Metode Pembayaran</h3>
                   <p className="text-xs text-slate-400 text-left">Porsi dari omzet periode terpilih</p>
@@ -1683,9 +1920,24 @@ export default function IndigoPOSDashboard() {
                 </div>
               </div>
 
-              <div className="lg:col-span-8 figma-card p-6 text-left">
-                <div className="flex items-center justify-between mb-4 text-left">
-                  <h3 className="font-extrabold text-base text-slate-900 text-left">Riwayat Transaksi Terperinci</h3>
+              <div className="lg:col-span-8 figma-card p-6 text-left bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 text-left">
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900 text-left">Riwayat Transaksi Struk</h3>
+                    {reportProductFilter !== "all" && (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                          Menyaring: {reportProductFilter}
+                        </span>
+                        <button
+                          onClick={() => setReportProductFilter("all")}
+                          className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
+                        >
+                          Reset Filter
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <span className="text-xs text-slate-400 text-left">{filteredTransactions.length} Total Transaksi</span>
                 </div>
 
@@ -1703,8 +1955,8 @@ export default function IndigoPOSDashboard() {
                     <tbody className="divide-y divide-slate-100 font-medium text-xs text-left">
                       {filteredTransactions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="text-left py-10 px-4 text-slate-400">
-                            Tidak ada data transaksi pada periode yang dipilih.
+                          <td colSpan={5} className="text-center py-10 px-4 text-slate-400">
+                            Tidak ada data transaksi pada filter yang dipilih.
                           </td>
                         </tr>
                       ) : (
@@ -1716,23 +1968,25 @@ export default function IndigoPOSDashboard() {
                           >
                             <td className="py-3 px-4 text-slate-500 text-left">{formatDate(tx.createdAt)}</td>
                             <td className="py-3 px-4 font-mono font-bold text-slate-800 text-left">
-                              {tx.invoiceNumber || tx.id}
+                              #{tx.invoiceNumber || tx.id}
                             </td>
-                            <td className="py-3 px-4 text-slate-700 text-left">
-                              {(tx.items || []).length} jenis menu
+                            <td className="py-3 px-4 text-slate-800 text-left font-medium">
+                              {(tx.items || []).map((i) => i.name + " (" + i.qty + "x)").join(", ")}
                             </td>
                             <td className="py-3 px-4 text-left">
                               <span
-                                className={"text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border text-left " + (
+                                className={"text-[11px] font-extrabold px-2 py-0.5 rounded-full " + (
                                   tx.paymentMethod === "QRIS"
-                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                                    : tx.paymentMethod === "TRANSFER"
+                                    ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                    : "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                 )}
                               >
                                 {tx.paymentMethod}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-left font-extrabold text-slate-900">
+                            <td className="py-3 px-4 font-black text-slate-900 text-left">
                               {formatIDR(tx.grandTotal)}
                             </td>
                           </tr>
@@ -1746,337 +2000,6 @@ export default function IndigoPOSDashboard() {
           </div>
         )}
       </main>
-
-      {/* ================= MODAL: HAPUS / BERSIHKAN DATABASE ================= */}
-      {isDeleteMonthModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
-              <div className="flex items-center gap-2.5 text-left">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 text-left">Kelola & Bersihkan Database</h3>
-                  <p className="text-xs text-slate-500 text-left">Pilih kategori data yang ingin dihapus</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsDeleteMonthModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
-              >
-                ?
-              </button>
-            </div>
-
-            {/* Live Database Info Summary */}
-            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-              <div className="p-1">
-                <span className="text-[10px] text-slate-500 font-bold block">Transaksi</span>
-                <strong className="text-xs text-slate-900">{transactions.length} Data</strong>
-              </div>
-              <div className="p-1 border-x border-slate-200">
-                <span className="text-[10px] text-slate-500 font-bold block">Log Mutasi</span>
-                <strong className="text-xs text-slate-900">{inventoryLogs.length} Log</strong>
-              </div>
-              <div className="p-1">
-                <span className="text-[10px] text-slate-500 font-bold block">Menu Menu</span>
-                <strong className="text-xs text-slate-900">{products.length} Menu</strong>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs text-left">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Pilih Data Yang Ingin Dihapus:</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "month" ? "bg-indigo-50/70 border-indigo-300 text-indigo-950 font-bold ring-1 ring-indigo-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
-                  )}>
-                    <input
-                      type="radio"
-                      name="delete_scope"
-                      checked={deleteScope === "month"}
-                      onChange={() => setDeleteScope("month")}
-                      className="accent-indigo-600"
-                    />
-                    <div>
-                      <p className="font-bold text-xs">Hapus Transaksi & Mutasi Stok Per Bulan</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Membersihkan struk dan catatan mutasi stok di bulan terpilih</p>
-                    </div>
-                  </label>
-
-                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "all_logs" ? "bg-amber-50/70 border-amber-300 text-amber-950 font-bold ring-1 ring-amber-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
-                  )}>
-                    <input
-                      type="radio"
-                      name="delete_scope"
-                      checked={deleteScope === "all_logs"}
-                      onChange={() => setDeleteScope("all_logs")}
-                      className="accent-amber-600"
-                    />
-                    <div>
-                      <p className="font-bold text-xs">Hapus SEMUA Buku Mutasi Stok ({inventoryLogs.length} Log)</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Mengosongkan seluruh riwayat keluar-masuk stok barang</p>
-                    </div>
-                  </label>
-
-                  <label className={"p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all " + (
-                    deleteScope === "reset_all" ? "bg-rose-50 border-rose-300 text-rose-950 font-bold ring-1 ring-rose-300" : "bg-slate-50 border-slate-200 text-slate-700 font-medium"
-                  )}>
-                    <input
-                      type="radio"
-                      name="delete_scope"
-                      checked={deleteScope === "reset_all"}
-                      onChange={() => setDeleteScope("reset_all")}
-                      className="accent-rose-600"
-                    />
-                    <div>
-                      <p className="font-bold text-xs">Reset Total (Semua Transaksi & Mutasi Stok)</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Mengosongkan riwayat kasir & log mutasi ({transactions.length} Transaksi, {inventoryLogs.length} Log)</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {deleteScope === "month" && (
-                <div className="text-left bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <label className="block font-bold text-slate-700 mb-1.5">Pilih Bulan Transaksi:</label>
-                  <select
-                    value={monthToDelete || (availableMonths[0]?.key || "")}
-                    onChange={(e) => setMonthToDelete(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  >
-                    {availableMonths.map((m) => {
-                      const txCount = transactions.filter((t) => {
-                        const d = new Date(t.createdAt);
-                        const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-                        return k === m.key;
-                      }).length;
-                      const logCount = inventoryLogs.filter((l) => {
-                        const d = new Date(l.timestamp);
-                        const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-                        return k === m.key;
-                      }).length;
-                      return (
-                        <option key={m.key} value={m.key}>
-                          {m.label} ({txCount} Transaksi, {logCount} Mutasi Stok)
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
-
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] leading-relaxed">
-                <p className="font-bold">?? Perhatian:</p>
-                <p>Data yang dihapus dari Firebase tidak dapat dikembalikan. Pastikan Anda telah mengunduh file CSV laporan keuangan terlebih dahulu jika ingin mengarsipkan.</p>
-              </div>
-
-              <label className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-slate-800 font-bold">
-                <input
-                  type="checkbox"
-                  checked={isConfirmedCheckbox}
-                  onChange={(e) => setIsConfirmedCheckbox(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded text-rose-600 accent-rose-600 cursor-pointer"
-                />
-                <span className="text-xs font-bold leading-tight">
-                  Saya mengonfirmasi ingin menghapus data ini dari database.
-                </span>
-              </label>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
-              <button
-                type="button"
-                onClick={() => setIsDeleteMonthModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting || !isConfirmedCheckbox}
-                onClick={handleDeleteMonthTransactions}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-white shadow-sm shadow-rose-200 text-xs flex items-center gap-1.5"
-              >
-                {isDeleting ? "Menghapus..." : "Hapus Data Sekarang"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL: TAMBAH / EDIT MENU ================= */}
-      {(isAddProductOpen || isEditProductOpen) && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200 space-y-5 text-left">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
-              <div className="text-left">
-                <h3 className="font-extrabold text-lg text-slate-900 text-left">
-                  {editingProduct ? "Edit Menu & Harga Jual" : "Tambah Menu Baru"}
-                </h3>
-                <p className="text-xs text-slate-400 text-left">Data akan tersinkronisasi otomatis ke Tablet Kasir</p>
-              </div>
-              <button
-                onClick={() => {
-                  setIsAddProductOpen(false);
-                  setIsEditProductOpen(false);
-                }}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm"
-              >
-                ?
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-medium text-left">
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1 text-left">Nama Menu *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Contoh: Kopi Susu Gula Aren"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-left">
-                <div className="text-left">
-                  <label className="block font-bold text-slate-700 mb-1 text-left">Harga Jual (Rp) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="18000"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-extrabold text-sm focus:outline-none focus:border-indigo-500 text-left"
-                  />
-                </div>
-
-                <div className="text-left">
-                  <label className="block font-bold text-slate-700 mb-1 text-left">Kategori Menu *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium text-left"
-                  >
-                    <option value="Minuman">Minuman</option>
-                    <option value="Makanan">Makanan</option>
-                    <option value="Snack">Cemilan & Snack</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="text-left">
-                <label className="block font-bold text-slate-700 mb-1 text-left">Stok Awal (Unit) *</label>
-                <input
-                  type="number"
-                  required
-                  value={formData.stockQuantity}
-                  onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                  placeholder="50"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-left"
-                />
-              </div>
-
-              {/* Enhanced Image Section: Upload File or URL */}
-              <div className="text-left space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block font-bold text-slate-700 text-left">Foto Menu Produk</label>
-                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setImageUploadMode("upload")}
-                      className={"px-2.5 py-1 rounded-md font-bold transition-all " + (
-                        imageUploadMode === "upload" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"
-                      )}
-                    >
-                      Upload File
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageUploadMode("url")}
-                      className={"px-2.5 py-1 rounded-md font-bold transition-all " + (
-                        imageUploadMode === "url" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"
-                      )}
-                    >
-                      URL Web
-                    </button>
-                  </div>
-                </div>
-
-                {imageUploadMode === "upload" ? (
-                  <div className="flex items-center gap-3">
-                    <label className="flex-1 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/20 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col items-center justify-center text-center group">
-                      <Upload className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 mb-1 transition-colors" />
-                      <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-600">
-                        Klik untuk Pilih Foto dari Laptop
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WebP (Otomatis Dioptimasi)</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {formData.imageUrl && (
-                      <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
-                        <img
-                          src={formData.imageUrl}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="url"
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-indigo-500 text-left text-xs"
-                    />
-                    {formData.imageUrl && (
-                      <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
-                        <img
-                          src={formData.imageUrl}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-left">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddProductOpen(false);
-                    setIsEditProductOpen(false);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-sm shadow-indigo-200"
-                >
-                  Simpan & Sinkronkan ke Tablet
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ================= MODAL: ATUR STOK DENGAN PILIHAN BARANG ================= */}
       {isStockModalOpen && (
