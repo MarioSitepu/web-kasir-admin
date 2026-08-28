@@ -38,7 +38,7 @@ Sistem web admin dilindungi gerbang autentikasi tunggal khusus Administrator / P
 
 | Role / Akun | Username | Password Default | Hak Akses |
 | :--- | :--- | :--- | :--- |
-| **Administrator (Owner)** | `admin` *(atau `mario`)* | `sapo123` | Akses penuh dashboard omzet, edit menu & harga, mutasi stok, laporan transaksi & reset database |
+| **Administrator (Owner)** | `admin` | `sapo123` | Akses penuh dashboard omzet, edit menu & harga, mutasi stok, laporan transaksi & reset database |
 
 > ?? *Untuk mengubah kata sandi admin, Anda dapat mengatur variabel `NEXT_PUBLIC_ADMIN_PASSWORD` di file `.env.local` atau di pengaturan Environment Variables Vercel.*
 
