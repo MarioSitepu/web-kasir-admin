@@ -87,7 +87,7 @@ const parseTransaction = (key: string, val: any): Transaction => {
       const prod = (i && typeof i.product === "object" && i.product !== null) ? i.product : (typeof i === "object" && i !== null ? i : {});
       let rawName = String(prod.name || i.name || i.product_name || "");
       if (!rawName || rawName === "Item" || rawName === "Unnamed Product") {
-        rawName = "Paket Ayam Geprek"; // Sensible default for Sapo Sapo UMKM
+        rawName = "Ayam Goreng Kencur Andaliman"; // Sensible default for Sapo Sapo UMKM
       }
       
       const qty = Number(i.quantity ?? i.qty ?? 1) || 1;
@@ -111,7 +111,7 @@ const parseTransaction = (key: string, val: any): Transaction => {
   } else if (grandTotal > 0) {
     items = [{
       id: "item_auto",
-      name: "Paket Ayam Geprek",
+      name: "Ayam Goreng Kencur Andaliman",
       price: grandTotal,
       qty: 1,
       subtotal: grandTotal,
@@ -438,7 +438,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
     filteredTransactions.forEach((t) => {
       (t.items || []).forEach((item) => {
-        const name = (item.name && item.name !== "Item" && item.name !== "Unnamed Product") ? item.name : "Paket Ayam Geprek";
+        const name = (item.name && item.name !== "Item" && item.name !== "Unnamed Product") ? item.name : "Ayam Goreng Kencur Andaliman";
         if (!map[name]) {
           const prod = products.find((p) => p.name.toLowerCase() === name.toLowerCase());
           map[name] = {
@@ -508,7 +508,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
     const itemMap: { [name: string]: { qty: number; revenue: number } } = {};
     filteredTransactions.forEach((t) => {
       (t.items || []).forEach((item) => {
-        const rawName = (item.name && item.name !== "Item" && item.name !== "Unnamed Product") ? item.name : "Paket Ayam Geprek";
+        const rawName = (item.name && item.name !== "Item" && item.name !== "Unnamed Product") ? item.name : "Ayam Goreng Kencur Andaliman";
         if (!itemMap[rawName]) itemMap[rawName] = { qty: 0, revenue: 0 };
         const qty = item.qty || 1;
         itemMap[rawName].qty += qty;
@@ -2326,7 +2326,7 @@ const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Paket Ayam Geprek Sambal Matah"
+                  placeholder="Contoh: Ayam Goreng Kencur Andaliman Sambal Matah"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs focus:outline-none focus:border-indigo-500"

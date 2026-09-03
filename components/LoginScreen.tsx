@@ -72,7 +72,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center justify-center gap-2">
               <span>Sapo Sapo</span>
               <span className="text-xs uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                Ayam Geprek
+                Ayam Goreng Kencur Andaliman
               </span>
             </h1>
             <p className="text-xs text-slate-400 font-medium mt-1">
@@ -170,7 +170,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500">
-          <p>Sapo Sapo Ayam Geprek - Jl. Parang 1, Medan</p>
+          <p>Sapo Sapo Ayam Goreng Kencur Andaliman - Jl. Parang 1, Medan</p>
           <p className="text-[10px] mt-0.5 text-slate-600">Sistem Kasir Terintegrasi Android POS & Cloud Firebase</p>
         </div>
       </div>
